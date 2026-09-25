@@ -3,6 +3,10 @@
  * docs/superpowers/specs/2026-04-17-cloud-workflow-editor-design.md §3.4.
  */
 import type { WorkflowDoc, ProcessorExecutionMode } from '../../gateways';
+import {
+  checkCyodaGoSchemaVersion,
+  validateCyodaGoCondition,
+} from '../../components/cloud-workflows/conditionCatalog';
 
 export interface ValidationIssue {
   path: string;
@@ -11,10 +15,23 @@ export interface ValidationIssue {
 
 const VALID_EXECUTION_MODES: ProcessorExecutionMode[] = ['SYNC', 'ASYNC_SAME_TX', 'ASYNC_NEW_TX'];
 
-export function validateWorkflowDoc(doc: WorkflowDoc): ValidationIssue[] {
+export interface ValidateWorkflowDocOptions {
+  /**
+   * Apply the rules cyoda-go enforces at workflow import (schema version range,
+   * criterion JSONPath grammar, operator catalog, single-child NOT).
+   */
+  cyodaGo?: boolean;
+}
+
+export function validateWorkflowDoc(doc: WorkflowDoc, opts: ValidateWorkflowDocOptions = {}): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
   if (!doc.version) issues.push({ path: '/version', message: 'Version is required.' });
+  else if (opts.cyodaGo) {
+    const versionError = checkCyodaGoSchemaVersion(doc.version);
+    if (versionError) issues.push({ path: '/version', message: versionError });
+  }
+  if (opts.cyodaGo) issues.push(...validateCyodaGoCondition(doc.criterion, '/criterion'));
   if (!doc.name) issues.push({ path: '/name', message: 'Name is required.' });
   if (!doc.initialState) issues.push({ path: '/initialState', message: 'Initial state is required.' });
 
@@ -51,6 +68,7 @@ export function validateWorkflowDoc(doc: WorkflowDoc): ValidationIssue[] {
       if (t.next && !(t.next in (doc.states ?? {}))) {
         issues.push({ path: `${tPath}/next`, message: `Target state "${t.next}" does not exist.` });
       }
+      if (opts.cyodaGo) issues.push(...validateCyodaGoCondition(t.criterion, `${tPath}/criterion`));
       if (typeof t.manual !== 'boolean') {
         issues.push({ path: `${tPath}/manual`, message: 'Transition "manual" must be boolean.' });
       }

@@ -7,7 +7,15 @@
  */
 import React from 'react';
 import { App, Button, Input, Select, Space, Typography } from 'antd';
+import { HelperFeatureFlags } from '@cyoda/http-api-react';
 import type { QueryCondition } from '../../gateways';
+import {
+  CASE_INSENSITIVE_OPS,
+  COMPARISON_OPS,
+  PATTERN_OPS,
+  PRESENCE_OPS,
+  STRING_OPS,
+} from './conditionCatalog';
 
 const { Text } = Typography;
 
@@ -16,14 +24,15 @@ export interface QueryConditionEditorProps {
   onChange: (next: QueryCondition | undefined) => void;
 }
 
-const STRING_OPS = ['EQUALS', 'NOT_EQUAL', 'CONTAINS', 'STARTS_WITH', 'ENDS_WITH'];
-const NUMERIC_OPS = ['LESS_THAN', 'LESS_THAN_OR_EQUAL', 'GREATER_THAN', 'GREATER_THAN_OR_EQUAL'];
-const COLLECTION_OPS = ['IN', 'NOT_IN', 'IS_NULL', 'IS_NOT_NULL'];
-
+// RANGE_OPS are omitted: BETWEEN needs a [low, high] array operand, which the
+// single text input below cannot produce.
+const toOptions = (ops: string[]) => ops.map((v) => ({ value: v, label: v }));
 const OPERATION_OPTIONS = [
-  { label: 'String', options: STRING_OPS.map((v) => ({ value: v, label: v })) },
-  { label: 'Numeric', options: NUMERIC_OPS.map((v) => ({ value: v, label: v })) },
-  { label: 'Collection', options: COLLECTION_OPS.map((v) => ({ value: v, label: v })) },
+  { label: 'Comparison', options: toOptions(COMPARISON_OPS) },
+  { label: 'String', options: toOptions(STRING_OPS) },
+  { label: 'Case-insensitive', options: toOptions(CASE_INSENSITIVE_OPS) },
+  { label: 'Pattern', options: toOptions(PATTERN_OPS) },
+  { label: 'Presence', options: toOptions(PRESENCE_OPS) },
 ];
 
 function isDestructiveSwitch(from: any, _toType: string): boolean {
@@ -96,7 +105,9 @@ export const QueryConditionEditor: React.FC<QueryConditionEditorProps> = ({ valu
             onChange={(e) => onChange({ ...(value as any), value: e.target.value })}
           />
           <Text type="secondary" style={{ fontSize: 12 }}>
-            Compared as a string. For typed comparisons (numeric, boolean), use a function condition.
+            {HelperFeatureFlags.isCyodaGo()
+              ? 'Parsed against the field\'s declared type, so "30" matches a numeric field. Paths start with $. (e.g. $.amount, $.tags[*]).'
+              : 'Compared as a string. For typed comparisons (numeric, boolean), use a function condition.'}
           </Text>
         </Space>
       )}

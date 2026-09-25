@@ -4,6 +4,7 @@ import { Button, Radio, Result, Space } from 'antd';
 import { App } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
+import { HelperFeatureFlags } from '@cyoda/http-api-react';
 import { createWorkflowEditorStore } from './workflowEditorStore';
 import { WorkflowEditorStoreContext, useWorkflowEditorStore } from './storeContext';
 import { useDirtyGuard } from './useDirtyGuard';
@@ -16,11 +17,14 @@ import { WorkflowSettingsForm } from './nodes/WorkflowSettingsForm';
 import { TabularView } from './views/TabularView';
 import { GraphicalView } from './views/GraphicalView';
 import { ConfigView } from './views/ConfigView';
+import { CYODA_GO_WORKFLOW_SCHEMA_VERSION } from '../../components/cloud-workflows/conditionCatalog';
 
-const SCAFFOLD: WorkflowDoc = {
-  version: '1.0', name: '', initialState: 'draft',
+// cyoda-go rejects schema version "1.0" at import (it accepts 1.1–1.4).
+const scaffold = (): WorkflowDoc => ({
+  version: HelperFeatureFlags.isCyodaGo() ? CYODA_GO_WORKFLOW_SCHEMA_VERSION : '1.0',
+  name: '', initialState: 'draft',
   states: { draft: { transitions: [] } }, active: true,
-};
+});
 
 export const WorkflowEditorCloud: React.FC = () => {
   const params = useParams<{ entityName: string; modelVersion: string; workflowName?: string }>();
@@ -39,7 +43,7 @@ export const WorkflowEditorCloud: React.FC = () => {
   // Hydrate once when fresh data arrives or for /new.
   useEffect(() => {
     if (store.getState().pristine !== null) return;
-    if (isNew && !isBadRef) store.getState().hydrate(SCAFFOLD);
+    if (isNew && !isBadRef) store.getState().hydrate(scaffold());
     else if (query.data) store.getState().hydrate(query.data);
   }, [store, isNew, isBadRef, query.data]);
 
@@ -109,10 +113,11 @@ const SaveBar: React.FC<{ isNew: boolean; entityName: string; modelVersion: numb
     if (!current) return;
     setSaving(true);
     try {
-      const issues = validateWorkflowDoc(current);
+      const issues = validateWorkflowDoc(current, { cyodaGo: HelperFeatureFlags.isCyodaGo() });
       if (issues.length > 0) {
         store.getState().setErrors(issues);
-        message.error('Validation failed — see highlighted fields.');
+        const more = issues.length > 1 ? ` (+${issues.length - 1} more)` : '';
+        message.error(`Validation failed at ${issues[0].path}: ${issues[0].message}${more}`);
         setSaving(false);
         return;
       }

@@ -208,3 +208,36 @@ describe('validateWorkflowDoc', () => {
     );
   });
 });
+
+describe('validateWorkflowDoc — cyoda-go import rules (v0.8.4)', () => {
+  const goValid: WorkflowDoc = { ...valid, version: '1.4' };
+  const badCriterion = { type: 'simple', jsonPath: 'amount', operation: 'EQUALS', value: '1' };
+
+  it('returns [] for a valid doc', () => {
+    expect(validateWorkflowDoc(goValid, { cyodaGo: true })).toEqual([]);
+  });
+
+  it('rejects schema version 1.0 in cyoda-go mode only', () => {
+    expect(validateWorkflowDoc(valid, { cyodaGo: true })).toContainEqual(
+      expect.objectContaining({ path: '/version' }),
+    );
+    expect(validateWorkflowDoc(valid)).toEqual([]);
+  });
+
+  it('validates the workflow criterion', () => {
+    expect(validateWorkflowDoc({ ...goValid, criterion: badCriterion }, { cyodaGo: true })).toContainEqual(
+      expect.objectContaining({ path: '/criterion/jsonPath' }),
+    );
+  });
+
+  it('validates transition criteria', () => {
+    const doc: WorkflowDoc = {
+      ...goValid,
+      states: { draft: { transitions: [{ name: 't1', next: 'draft', manual: false, criterion: badCriterion }] } },
+    };
+    expect(validateWorkflowDoc(doc, { cyodaGo: true })).toContainEqual(
+      expect.objectContaining({ path: '/states/draft/transitions/0/criterion/jsonPath' }),
+    );
+    expect(validateWorkflowDoc(doc)).toEqual([]);
+  });
+});
