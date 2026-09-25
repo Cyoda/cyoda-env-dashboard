@@ -101,6 +101,26 @@ Hidden by design — these features have no cloud variant. If/when one is built,
 revisit the gating helpers (`isReportingAvailable()`, `isTasksAvailable()`,
 `isProcessingManagerAvailable()`).
 
+## cyoda-go version compatibility
+
+Go mode targets **cyoda-go v0.8.4**. Since that release, workflow import
+rejects (`400 VALIDATION_FAILED` / `WORKFLOW_SCHEMA_VERSION_UNSUPPORTED`)
+documents that earlier versions accepted silently. The cloud workflow editor
+checks the same rules before saving, but only in Go mode
+(`validateWorkflowDoc(doc, { cyodaGo: true })`):
+
+- Workflow `version` must be `1.1`–`1.4`. New workflows are scaffolded at `1.4`
+  in Go mode and `1.0` in Cloud mode.
+- Criterion `jsonPath` must follow the JSON Path grammar (`$.amount`, not
+  `amount`; subscripts only `[*]` or `[N]`).
+- Operators must come from the catalog in
+  `packages/statemachine-react/src/components/cloud-workflows/conditionCatalog.ts`.
+- A `NOT` group takes exactly one child.
+
+The model and version bounds live in `conditionCatalog.ts`. When a new
+cyoda-go release bumps the workflow schema, update them to match
+`GET /api/help/workflows/schema-version/versions`.
+
 ## How to add a new panel
 
 When introducing a new panel:

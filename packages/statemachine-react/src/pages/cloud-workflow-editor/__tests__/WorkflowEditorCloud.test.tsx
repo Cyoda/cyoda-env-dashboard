@@ -167,6 +167,27 @@ describe('WorkflowEditorCloud — save flow', () => {
     });
   });
 
+  it('on cyoda-go, a new workflow is saved with a schema version cyoda-go accepts', async () => {
+    vi.stubEnv('VITE_FEATURE_FLAG_IS_CYODA_GO', 'true');
+    try {
+      const gw = makeGateway();
+      vi.mocked(getWorkflowGateway).mockReturnValue(gw as any);
+      renderAt('/workflow/Customer/1/new');
+      await waitFor(() => expect(screen.getByText(/Workflow settings/)).toBeInTheDocument());
+      await userEvent.type(await screen.findByRole('textbox', { name: /^Name$/i }), 'created');
+      await userEvent.click(screen.getByRole('button', { name: /^Save$/ }));
+      await waitFor(() => {
+        expect(gw.saveWorkflow).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ name: 'created', version: '1.4' }),
+          'MERGE',
+        );
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('Discard-changes confirms then resets to pristine', async () => {
     const gw = makeGateway();
     vi.mocked(getWorkflowGateway).mockReturnValue(gw as any);
