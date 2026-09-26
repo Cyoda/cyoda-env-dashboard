@@ -95,8 +95,8 @@ values. Reference for every variable below.
 > `VITE_*` variable.
 >
 > - **Safe to put behind `VITE_`:** API base URLs, OIDC client IDs,
->   audiences and organization IDs (Auth0 designs SPA client IDs to be
->   public — security comes from the Allowed Callback URLs and PKCE,
+>   audiences and organization IDs (public (PKCE) clients are designed
+>   that way — security comes from the registered redirect URIs and PKCE,
 >   not from hiding the ID), feature flags.
 > - **Never put behind `VITE_`:** API keys, passwords, signing keys,
 >   refresh tokens, database credentials, or anything you wouldn't post
