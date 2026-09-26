@@ -39,6 +39,8 @@ cyoda-env-dashboard/
 │
 ├── apps/saas-app/
 │   ├── .env.template                       # Template for the SaaS app
+│   ├── .env.cloud.example                  # Example: Cyoda Cloud + Auth0 (auth.cyoda.net)
+│   ├── .env.cloud-ai-dev.example           # Example: AI dev backend + Auth0 dev tenant
 │   ├── .env                                # Main config (gitignored)
 │   └── .env.development.local              # Local overrides (gitignored)
 │
@@ -47,9 +49,13 @@ cyoda-env-dashboard/
     │   └── .env.development.local          # Standalone package config (gitignored)
 ```
 
-> `.gitignore` rule: `.env*` is ignored except for `.env.template`. This means
-> `apps/saas-app/.env.template` (and every nested `.env.template`) is **not**
-> whitelisted by the root rule alone — review `.gitignore` before relying on it.
+> `.gitignore` rule: `.env*` is ignored except for `.env.template` and
+> `.env*.example`, at any depth. Templates and examples are committed; every
+> other `.env*` file stays local.
+>
+> The two `.env.cloud*.example` files are real configurations from the (now
+> torn-down) Cyoda Cloud setups, mapped to `VITE_APP_OIDC_*`. Copy one to
+> `apps/saas-app/.env` to start from it.
 
 ---
 
@@ -221,14 +227,15 @@ When this flag is set:
 | File                                       | Used by              | Purpose           | In git? |
 |--------------------------------------------|----------------------|-------------------|---------|
 | `apps/saas-app/.env`                       | SaaS app             | Main config       | No (.gitignore) |
-| `apps/saas-app/.env.template`              | —                    | Template          | No¹     |
+| `apps/saas-app/.env.template`              | —                    | Template          | Yes     |
+| `apps/saas-app/.env.cloud*.example`        | —                    | Cloud examples    | Yes     |
 | `apps/saas-app/.env.development.local`     | SaaS app             | Local overrides   | No (.gitignore) |
 | `.env.template`                            | Standalone packages  | Template          | Yes (whitelisted) |
 | `.env.template.development.local`          | Standalone packages  | Older template    | No¹     |
 | `packages/*/.env*.local`                   | Standalone packages  | Package config    | No (.gitignore) |
 
-¹ `.gitignore` only whitelists the root `.env.template`; the nested and
-alternate-named templates are ignored by default.
+¹ `.gitignore` whitelists only files named exactly `.env.template` or matching
+`.env*.example`; alternate-named templates like this one stay ignored.
 
 ---
 
