@@ -79,9 +79,19 @@ export function completeLogin(): Promise<void> {
   if (completion?.url !== url) {
     completion = {
       url,
-      promise: getManager()
-        .signinRedirectCallback(url)
-        .then((user) => {
+      // Wrapped in Promise.resolve().then(...) so a synchronous throw from
+      // getManager() (no OIDC config) surfaces as a rejection, not a thrown
+      // error out of this memo, which would otherwise crash OidcCallback's
+      // effect synchronously instead of producing the error Result.
+      promise: Promise.resolve()
+        .then(() => getManager().signinRedirectCallback(url))
+        .then(async (user) => {
+          if (user.scope) {
+            // Refreshes must omit `scope` (RFC 6749 §6); stripping it here,
+            // once, means doRefresh normally has nothing to strip.
+            user.scope = undefined;
+            await getManager().storeUser(user);
+          }
           helperStorage.set('auth', {
             token: user.access_token,
             refreshToken: '',
@@ -112,14 +122,17 @@ async function doRefresh(failedToken?: string): Promise<string> {
     throw new Error('No refresh token available');
   }
 
-  if (before.scope) {
-    // Zitadel rejects some previously-granted scopes (e.g. the roles scope)
-    // on refresh; omitting `scope` keeps the original grant (RFC 6749 §6).
-    before.scope = undefined;
-    await um.storeUser(before);
-  }
-
   try {
+    if (before.scope) {
+      // Fallback for users stored before completeLogin started stripping
+      // scope up front. Zitadel rejects some previously-granted scopes
+      // (e.g. the roles scope) on refresh; omitting `scope` keeps the
+      // original grant (RFC 6749 §6). Kept inside the try so a storeUser
+      // rejection goes through the same adoption/clearSession path below.
+      before.scope = undefined;
+      await um.storeUser(before);
+    }
+
     const user = await um.signinSilent();
     if (!user) {
       throw new Error('Token refresh returned no user');

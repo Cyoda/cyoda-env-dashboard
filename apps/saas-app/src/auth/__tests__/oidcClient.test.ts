@@ -93,6 +93,17 @@ describe('oidcClient', () => {
     expect(um().signinRedirect).toHaveBeenCalledWith({ extraQueryParams: { audience: 'api' } });
   });
 
+  it('completeLogin rejects (not throws) when OIDC is not configured', () => {
+    vi.mocked(getOidcConfig).mockReturnValue(null);
+
+    let promise: Promise<void>;
+    expect(() => {
+      promise = completeLogin();
+    }).not.toThrow();
+
+    return expect(promise!).rejects.toThrow('OIDC login is not configured');
+  });
+
   it('completeLogin writes cyoda_auth and shares one callback for repeated calls', async () => {
     await startLogin();
     um().signinRedirectCallback.mockResolvedValue(user());
@@ -101,6 +112,25 @@ describe('oidcClient', () => {
 
     expect(um().signinRedirectCallback).toHaveBeenCalledTimes(1);
     expect(auth()).toEqual({ token: 'at-1', refreshToken: '', user: 'analyst', userId: 'sub-1', type: 'oidc' });
+  });
+
+  it('completeLogin strips scope and stores the user before writing cyoda_auth', async () => {
+    await startLogin();
+    um().signinRedirectCallback.mockResolvedValue(user({ scope: 'openid offline_access urn:x' }));
+
+    await completeLogin();
+
+    expect(um().storeUser).toHaveBeenCalledWith(expect.objectContaining({ scope: undefined, access_token: 'at-1' }));
+    expect(auth()).toEqual({ token: 'at-1', refreshToken: '', user: 'analyst', userId: 'sub-1', type: 'oidc' });
+  });
+
+  it('completeLogin does not store the user when it has no scope', async () => {
+    await startLogin();
+    um().signinRedirectCallback.mockResolvedValue(user());
+
+    await completeLogin();
+
+    expect(um().storeUser).not.toHaveBeenCalled();
   });
 
   describe('refreshToken', () => {
@@ -192,6 +222,16 @@ describe('oidcClient', () => {
       expect(um().removeUser).toHaveBeenCalled();
       expect(auth()).toBeNull();
     });
+
+    it('clears and rejects when storeUser fails while stripping a legacy scope', async () => {
+      um().getUser.mockResolvedValue(user({ scope: 'openid offline_access urn:x' }));
+      um().storeUser.mockRejectedValueOnce(new Error('storage full'));
+
+      await expect(refreshToken('at-1')).rejects.toThrow('storage full');
+      expect(um().signinSilent).not.toHaveBeenCalled();
+      expect(um().removeUser).toHaveBeenCalled();
+      expect(auth()).toBeNull();
+    });
   });
 
   describe('logout', () => {
@@ -253,6 +293,36 @@ describe('oidcClient', () => {
 
       await expect(logout()).resolves.toBe('local');
       expect(window.location.assign).not.toHaveBeenCalled();
+    });
+
+    it('uses LOGOUT_URL when discovery fails', async () => {
+      vi.mocked(getOidcConfig).mockReturnValue({
+        issuer: 'http://idp', clientId: 'abc', displayName: 'Auth0', scopes: 's', extraParams: {},
+        logoutUrl: 'http://idp/v2/logout',
+      });
+      resetOidcClient();
+      await startLogin();
+      um().getUser.mockResolvedValue(user());
+      um().metadataService.getEndSessionEndpoint.mockRejectedValue(new Error('offline'));
+
+      await expect(logout()).resolves.toBe('redirecting');
+      expect(window.location.assign).toHaveBeenCalledWith('http://idp/v2/logout');
+      expect(um().signoutRedirect).not.toHaveBeenCalled();
+    });
+
+    it('falls back to LOGOUT_URL when signoutRedirect rejects later', async () => {
+      vi.mocked(getOidcConfig).mockReturnValue({
+        issuer: 'http://idp', clientId: 'abc', displayName: 'Auth0', scopes: 's', extraParams: {},
+        logoutUrl: 'http://idp/v2/logout',
+      });
+      resetOidcClient();
+      await startLogin();
+      um().getUser.mockResolvedValue(user());
+      um().metadataService.getEndSessionEndpoint.mockResolvedValue('http://idp/end');
+      um().signoutRedirect.mockRejectedValue(new Error('boom'));
+
+      await expect(logout()).resolves.toBe('redirecting');
+      await vi.waitFor(() => expect(window.location.assign).toHaveBeenCalledWith('http://idp/v2/logout'));
     });
 
     it('clearAll wipes all storage after reading the id_token', async () => {

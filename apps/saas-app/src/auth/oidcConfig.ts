@@ -15,6 +15,13 @@ export interface OidcConfig {
 export const DEFAULT_SCOPES = 'openid profile email offline_access';
 
 let warned = false;
+let warnedLeftoverAuth0 = false;
+
+function hasLeftoverAuth0Vars(env: Record<string, unknown>): boolean {
+  return Object.keys(env).some(
+    (key) => key.startsWith('VITE_APP_AUTH0_') && typeof env[key] === 'string' && env[key] !== ''
+  );
+}
 
 export function getOidcConfig(
   env: Record<string, unknown> = import.meta.env as unknown as Record<string, unknown>
@@ -33,6 +40,12 @@ export function getOidcConfig(
       const missing = issuer ? 'VITE_APP_OIDC_CLIENT_ID' : 'VITE_APP_OIDC_ISSUER';
       console.warn(`[oidc] OIDC login disabled: ${missing} is not set`);
     }
+    if (!warnedLeftoverAuth0 && hasLeftoverAuth0Vars(env)) {
+      warnedLeftoverAuth0 = true;
+      console.warn(
+        '[oidc] VITE_APP_AUTH0_* is no longer read; rename to VITE_APP_OIDC_* (see apps/saas-app/README.md#oidc-login)'
+      );
+    }
     return null;
   }
 
@@ -49,4 +62,5 @@ export function getOidcConfig(
 /** Test helper. */
 export function resetOidcConfigWarning(): void {
   warned = false;
+  warnedLeftoverAuth0 = false;
 }

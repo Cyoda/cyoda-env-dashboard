@@ -52,4 +52,38 @@ describe('getOidcConfig', () => {
   it('ignores non-string env values', () => {
     expect(getOidcConfig({ VITE_APP_OIDC_ISSUER: true, VITE_APP_OIDC_CLIENT_ID: 'abc' })).toBeNull();
   });
+
+  describe('leftover VITE_APP_AUTH0_* warning', () => {
+    it('warns once with only VITE_APP_AUTH0_DOMAIN set', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      getOidcConfig({ VITE_APP_AUTH0_DOMAIN: 'dev-ex6r-yqc.us.auth0.com' });
+      getOidcConfig({ VITE_APP_AUTH0_DOMAIN: 'dev-ex6r-yqc.us.auth0.com' });
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('VITE_APP_AUTH0_* is no longer read');
+      expect(warn.mock.calls[0][0]).toContain('VITE_APP_OIDC_*');
+      expect(warn.mock.calls[0][0]).toContain('apps/saas-app/README.md#oidc-login');
+    });
+
+    it('does not warn when OIDC is configured', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      getOidcConfig({
+        VITE_APP_OIDC_ISSUER: 'http://idp',
+        VITE_APP_OIDC_CLIENT_ID: 'abc',
+        VITE_APP_AUTH0_DOMAIN: 'dev-ex6r-yqc.us.auth0.com',
+      });
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not warn with empty env', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      expect(getOidcConfig({})).toBeNull();
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
 });

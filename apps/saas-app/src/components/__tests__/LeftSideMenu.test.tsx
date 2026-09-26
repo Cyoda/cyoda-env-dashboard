@@ -2,7 +2,7 @@
  * LeftSideMenu Component Tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -24,6 +24,12 @@ const oidcMock = vi.hoisted(() => ({
   logout: vi.fn(async (): Promise<'redirecting' | 'local'> => 'local'),
 }));
 vi.mock('../../auth/oidcClient', () => oidcMock);
+
+const navigateMock = vi.hoisted(() => vi.fn());
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig<typeof import('react-router-dom')>()),
+  useNavigate: () => navigateMock,
+}));
 
 // Mock the AppLogo component
 vi.mock('@cyoda/ui-lib-react', () => ({
@@ -477,9 +483,16 @@ describe('LeftSideMenu', () => {
 
   describe('OIDC logout', () => {
     beforeEach(() => {
-      oidcMock.isOidcEnabled.mockReturnValue(true);
+      storageMock.get.mockReset().mockReturnValue({ token: 't', user: 'u', type: 'oidc' });
+      storageMock.remove.mockReset();
+      storageMock.clear.mockReset();
+      oidcMock.isOidcEnabled.mockReset().mockReturnValue(true);
       oidcMock.logout.mockReset();
-      storageMock.get.mockReturnValue({ token: 't', user: 'u', type: 'oidc' });
+      navigateMock.mockReset();
+    });
+
+    afterEach(() => {
+      oidcMock.isOidcEnabled.mockReturnValue(false);
     });
 
     async function openLogoutModal() {
@@ -496,6 +509,18 @@ describe('LeftSideMenu', () => {
       await user.click(screen.getByRole('button', { name: /^Logout$/ }));
       await waitFor(() => expect(oidcMock.logout).toHaveBeenCalledWith());
       expect(storageMock.remove).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(screen.queryByText('Do you really want to logout?')).not.toBeVisible(),
+      );
+      expect(navigateMock).not.toHaveBeenCalledWith('/login');
+    });
+
+    it('Logout navigates to /login when the result is local', async () => {
+      oidcMock.logout.mockResolvedValue('local');
+      const user = await openLogoutModal();
+      await user.click(screen.getByRole('button', { name: /^Logout$/ }));
+      await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/login'));
+      await waitFor(() => expect(screen.queryByText('Do you really want to logout?')).not.toBeVisible());
     });
 
     it('Logout and clear calls oidc logout with clearAll', async () => {
@@ -503,6 +528,23 @@ describe('LeftSideMenu', () => {
       const user = await openLogoutModal();
       await user.click(screen.getByRole('button', { name: /Logout and Clear Data/ }));
       await waitFor(() => expect(oidcMock.logout).toHaveBeenCalledWith({ clearAll: true }));
+      await waitFor(() => expect(screen.queryByText('Do you really want to logout?')).not.toBeVisible());
+    });
+
+    it('Logout and clear navigates to /login when the result is local', async () => {
+      oidcMock.logout.mockResolvedValue('local');
+      const user = await openLogoutModal();
+      await user.click(screen.getByRole('button', { name: /Logout and Clear Data/ }));
+      await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/login'));
+    });
+
+    it('Logout and clear does not navigate when the result is redirecting', async () => {
+      oidcMock.logout.mockResolvedValue('redirecting');
+      const user = await openLogoutModal();
+      await user.click(screen.getByRole('button', { name: /Logout and Clear Data/ }));
+      await waitFor(() => expect(oidcMock.logout).toHaveBeenCalledWith({ clearAll: true }));
+      await waitFor(() => expect(screen.queryByText('Do you really want to logout?')).not.toBeVisible());
+      expect(navigateMock).not.toHaveBeenCalledWith('/login');
     });
   });
 });
