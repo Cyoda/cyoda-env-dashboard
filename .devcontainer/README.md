@@ -43,10 +43,10 @@ cp apps/saas-app/.env.template apps/saas-app/.env
 Then open `apps/saas-app/.env` in the VS Code editor and fill in at least:
 
 - `VITE_APP_BASE_URL` — the Cyoda backend URL
-- `VITE_APP_AUTH0_DOMAIN`
-- `VITE_APP_AUTH0_CLIENT_ID`
-- `VITE_APP_AUTH0_AUDIENCE`
-- `VITE_APP_AUTH0_ORGANIZATION` (if your tenant uses orgs)
+- `VITE_APP_OIDC_ISSUER`
+- `VITE_APP_OIDC_CLIENT_ID`
+- `VITE_APP_OIDC_DISPLAY_NAME`
+- `VITE_APP_OIDC_EXTRA_PARAMS` (Auth0's audience and organization)
 
 The full reference for every variable is in
 [`apps/saas-app/README.md`](../apps/saas-app/README.md#32-variable-reference).
@@ -67,18 +67,20 @@ host machine). The dev server inside the container is reachable at
 `localhost:5173` on the host because VS Code tunnels the connection
 through its remote extension host.
 
-## Auth0 callback URLs
+## OIDC redirect URIs
 
-Your existing Auth0 application's "Allowed Callback URLs" entry for
-`http://localhost:5173` works **unchanged** with Dev Containers — from the
-browser's point of view (which is what Auth0 sees), the URL is still
-`http://localhost:5173`. No new Auth0 configuration needed.
+The IdP must allow `http://localhost:5173/oidc/callback` as redirect URI,
+`http://localhost:5173/login` as post-logout URI, and origin
+`http://localhost:5173`. This works **unchanged** with Dev Containers — the
+port forward keeps the browser-side origin unchanged, so from the browser's
+point of view (which is what the IdP sees), the URL is still
+`http://localhost:5173`. No new IdP configuration needed.
 
-The only case that *would* require a new Auth0 callback URL is if you
-also use **GitHub Codespaces** with this same `devcontainer.json`. In
-that case the dev server is forwarded to a per-codespace URL like
+The only case that *would* require new IdP configuration is if you also use
+**GitHub Codespaces** with this same `devcontainer.json`. In that case the
+dev server is forwarded to a per-codespace URL like
 `https://yourname-fluffy-tribble-xxxx-5173.app.github.dev`, which would
-need to be added to Auth0 separately.
+need to be added to the IdP separately.
 
 ## Common tasks
 
@@ -124,7 +126,8 @@ went wrong on first run, rebuild via the command palette:
 You haven't created `apps/saas-app/.env` yet. See *Configure the SaaS app*
 above.
 
-**Auth0 redirect fails / "Callback URL mismatch"**
-Make sure your Auth0 application has `http://localhost:5173` in *all three*
-of: Allowed Callback URLs, Allowed Logout URLs, Allowed Web Origins. (This
-is the same requirement as the non-container setup.)
+**OIDC login redirect fails**
+Make sure the IdP allows `http://localhost:5173/oidc/callback` as redirect
+URI, `http://localhost:5173/login` as post-logout URI, and origin
+`http://localhost:5173`. (This is the same requirement as the non-container
+setup; the port forward keeps the browser-side origin unchanged.)

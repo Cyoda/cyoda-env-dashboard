@@ -127,53 +127,50 @@ program
       },
       {
         type: "confirm",
-        message: "Do you want to set Auth0 settings?",
-        name: "confirmAuth0"
+        message: "Do you want to set OIDC login settings?",
+        name: "confirmOidc"
       },
       {
         type: "input",
-        message: "Auth0: Domain",
-        name: "VITE_APP_AUTH0_DOMAIN",
-        default: () => envExist.VITE_APP_AUTH0_DOMAIN || null,
-        when: function (answers) {
-          return answers.confirmAuth0;
-        },
+        message: "OIDC: Button display name (e.g. Auth0, Zitadel)",
+        name: "VITE_APP_OIDC_DISPLAY_NAME",
+        default: () => envExist.VITE_APP_OIDC_DISPLAY_NAME || 'SSO',
+        when: (answers) => answers.confirmOidc,
       },
       {
         type: "input",
-        message: "Auth0: Client ID",
-        name: "VITE_APP_AUTH0_CLIENT_ID",
-        default: () => envExist.VITE_APP_AUTH0_CLIENT_ID || null,
-        when: function (answers) {
-          return answers.confirmAuth0;
-        },
+        message: "OIDC: Issuer URL (exactly as in the provider's discovery document)",
+        name: "VITE_APP_OIDC_ISSUER",
+        default: () => envExist.VITE_APP_OIDC_ISSUER || null,
+        when: (answers) => answers.confirmOidc,
       },
       {
         type: "input",
-        message: "Auth0: Audience",
-        name: "VITE_APP_AUTH0_AUDIENCE",
-        default: () => envExist.VITE_APP_AUTH0_AUDIENCE || null,
-        when: function (answers) {
-          return answers.confirmAuth0;
-        },
+        message: "OIDC: Client ID (public client, PKCE)",
+        name: "VITE_APP_OIDC_CLIENT_ID",
+        default: () => envExist.VITE_APP_OIDC_CLIENT_ID || null,
+        when: (answers) => answers.confirmOidc,
       },
       {
         type: "input",
-        message: "Auth0: Organization",
-        name: "VITE_APP_AUTH0_ORGANIZATION",
-        default: () => envExist.VITE_APP_AUTH0_ORGANIZATION || null,
-        when: function (answers) {
-          return answers.confirmAuth0;
-        },
+        message: "OIDC: Scopes",
+        name: "VITE_APP_OIDC_SCOPES",
+        default: () => envExist.VITE_APP_OIDC_SCOPES || 'openid profile email offline_access',
+        when: (answers) => answers.confirmOidc,
       },
       {
         type: "input",
-        message: "Auth0: Redirect Uri",
-        name: "VITE_APP_AUTH0_REDIRECT_URI",
-        default: () => envExist.VITE_APP_AUTH0_REDIRECT_URI || null,
-        when: function (answers) {
-          return answers.confirmAuth0;
-        },
+        message: "OIDC: Extra authorize params (query string, e.g. audience=...&organization=...)",
+        name: "VITE_APP_OIDC_EXTRA_PARAMS",
+        default: () => envExist.VITE_APP_OIDC_EXTRA_PARAMS || '',
+        when: (answers) => answers.confirmOidc,
+      },
+      {
+        type: "input",
+        message: "OIDC: Logout URL (only if the provider has no end_session_endpoint)",
+        name: "VITE_APP_OIDC_LOGOUT_URL",
+        default: () => envExist.VITE_APP_OIDC_LOGOUT_URL || '',
+        when: (answers) => answers.confirmOidc,
       },
     ]);
 
@@ -192,12 +189,17 @@ program
       env.VITE_FEATURE_FLAG_USE_MODELS_INFO = false;
     }
 
-    if (inquirerResult.confirmAuth0) {
-      env.VITE_APP_AUTH0_DOMAIN = inquirerResult.VITE_APP_AUTH0_DOMAIN || '';
-      env.VITE_APP_AUTH0_CLIENT_ID = inquirerResult.VITE_APP_AUTH0_CLIENT_ID || '';
-      env.VITE_APP_AUTH0_AUDIENCE = inquirerResult.VITE_APP_AUTH0_AUDIENCE || '';
-      env.VITE_APP_AUTH0_ORGANIZATION = inquirerResult.VITE_APP_AUTH0_ORGANIZATION || '';
-      env.VITE_APP_AUTH0_REDIRECT_URI = inquirerResult.VITE_APP_AUTH0_REDIRECT_URI || '';
+    if (inquirerResult.confirmOidc) {
+      for (const key of [
+        'VITE_APP_OIDC_DISPLAY_NAME',
+        'VITE_APP_OIDC_ISSUER',
+        'VITE_APP_OIDC_CLIENT_ID',
+        'VITE_APP_OIDC_SCOPES',
+        'VITE_APP_OIDC_EXTRA_PARAMS',
+        'VITE_APP_OIDC_LOGOUT_URL',
+      ]) {
+        if (inquirerResult[key]) env[key] = inquirerResult[key];
+      }
     }
 
     const envContent = stringify(env);

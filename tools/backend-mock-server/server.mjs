@@ -55,21 +55,6 @@ app.post('/api/auth/login', (req, res) => {
   });
 });
 
-// Auth0 login endpoint
-app.post('/api/auth/login/auth0', (req, res) => {
-  const authHeader = req.headers.authorization;
-  console.log(`🔐 Auth0 login attempt`);
-
-  // Mock Auth0 authentication
-  res.json({
-    token: 'mock-jwt-token-auth0-' + Date.now(),
-    refreshToken: 'mock-refresh-token-auth0-' + Date.now(),
-    username: 'auth0-user',
-    userId: 'user-auth0-' + Date.now(),
-    legalEntityId: 'legal-entity-001'
-  });
-});
-
 // Token refresh endpoint
 app.post('/api/auth/refresh', (req, res) => {
   const { refreshToken } = req.body;

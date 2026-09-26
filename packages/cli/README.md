@@ -12,7 +12,7 @@ This CLI tool helps you create and configure environment files (`.env.production
 - ✅ Environment file generation (.env.production, .env.development.local)
 - ✅ API endpoint validation
 - ✅ Feature flags configuration
-- ✅ Auth0 integration setup
+- ✅ OIDC login setup (Auth0, Zitadel, any OIDC provider)
 - ✅ Existing configuration detection and display
 - ✅ Beautiful CLI interface with colors and tables
 
@@ -63,12 +63,13 @@ The CLI will guide you through:
 4. **Feature Flags** (optional):
    - ChatBot feature
    - Models Info feature
-5. **Auth0 Configuration** (optional):
-   - Domain
-   - Client ID
-   - Audience
-   - Organization
-   - Redirect URI
+5. **OIDC Login Configuration** (optional):
+   - Button display name (e.g. Auth0, Zitadel)
+   - Issuer URL (exactly as in the provider's discovery document)
+   - Client ID (public client, PKCE)
+   - Scopes
+   - Extra authorize params (query string, e.g. audience=...&organization=...)
+   - Logout URL (only if the provider has no end_session_endpoint)
 
 ### Example Output
 
@@ -98,11 +99,12 @@ The CLI configures the following environment variables:
 - `VITE_APP_PUBLIC_PATH` - Alternative public path (production only)
 - `VITE_FEATURE_FLAG_CHATBOT` - Enable/disable ChatBot feature
 - `VITE_FEATURE_FLAG_USE_MODELS_INFO` - Enable/disable Models Info feature
-- `VITE_APP_AUTH0_DOMAIN` - Auth0 domain
-- `VITE_APP_AUTH0_CLIENT_ID` - Auth0 client ID
-- `VITE_APP_AUTH0_AUDIENCE` - Auth0 audience
-- `VITE_APP_AUTH0_ORGANIZATION` - Auth0 organization
-- `VITE_APP_AUTH0_REDIRECT_URI` - Auth0 redirect URI
+- `VITE_APP_OIDC_DISPLAY_NAME` - Button display name (e.g. Auth0, Zitadel)
+- `VITE_APP_OIDC_ISSUER` - OIDC issuer URL
+- `VITE_APP_OIDC_CLIENT_ID` - OIDC client ID (public client, PKCE)
+- `VITE_APP_OIDC_SCOPES` - OIDC scopes
+- `VITE_APP_OIDC_EXTRA_PARAMS` - Extra authorize params (query string)
+- `VITE_APP_OIDC_LOGOUT_URL` - Logout URL (only if the provider has no end_session_endpoint)
 
 ## File Structure
 

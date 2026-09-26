@@ -165,9 +165,10 @@ npm start
 
 ## Authentication
 
-The app uses Auth0. You need a working tenant configured via the
-`VITE_APP_AUTH0_*` variables in `apps/saas-app/.env`. See
-[`apps/saas-app/README.md`](./apps/saas-app/README.md#auth0).
+The app logs in either with username/password (Cyoda Cloud test/dev) or with
+any OIDC provider via `VITE_APP_OIDC_*` in `apps/saas-app/.env` — Auth0 for
+Cyoda Cloud, Zitadel for the ctcc cyoda-go stack. See
+[`apps/saas-app/README.md`](./apps/saas-app/README.md#oidc-login).
 
 ## Testing
 
@@ -199,7 +200,7 @@ Do not add these to any `.env.template` or other checked-in file.
 ## Tech stack
 
 React 18 · TypeScript 5 · Vite 6 · Ant Design 5 · React Router 6 ·
-TanStack Query · Zustand · Auth0 · Vitest · Playwright · pnpm 9 workspaces.
+TanStack Query · Zustand · oidc-client-ts · Vitest · Playwright · pnpm 9 workspaces.
 
 ## License
 

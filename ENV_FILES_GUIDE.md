@@ -69,9 +69,11 @@ Typical content:
 VITE_APP_API_BASE=/api
 VITE_APP_API_BASE_PROCESSING=
 VITE_APP_BASE_URL=https://cyoda-develop.kube3.cyoda.org/
-VITE_APP_AUTH0_DOMAIN=auth.cyoda.net
-VITE_APP_AUTH0_CLIENT_ID=<your-client-id>
-VITE_APP_AUTH0_AUDIENCE=https://cloud.cyoda.com/api
+VITE_APP_OIDC_DISPLAY_NAME=Auth0
+VITE_APP_OIDC_ISSUER=https://auth.cyoda.net/
+VITE_APP_OIDC_CLIENT_ID=<your-auth0-spa-client-id>
+VITE_APP_OIDC_EXTRA_PARAMS=audience=https://cloud.cyoda.com/api&organization=<your-auth0-org-id>
+VITE_APP_OIDC_LOGOUT_URL=https://auth.cyoda.net/v2/logout?client_id=<your-auth0-spa-client-id>&returnTo=http%3A%2F%2Flocalhost%3A5173%2Flogin
 # ...
 ```
 
@@ -139,7 +141,7 @@ Vite reads from the package directory, e.g.
 ```bash
 pnpm install
 cp apps/saas-app/.env.template apps/saas-app/.env
-# edit VITE_APP_BASE_URL and Auth0 values
+# edit VITE_APP_BASE_URL and OIDC values
 pnpm dev
 # open http://localhost:5173
 ```
@@ -201,6 +203,16 @@ When this flag is set:
 > panel-by-mode matrix and the current known gaps (notably: the
 > Business/Technical entity-type toggle has no meaningful "Technical" option
 > in Go mode, since legacy `/platform-*` endpoints aren't reachable).
+
+## OIDC login against ctcc (Zitadel + cyoda-go)
+
+1. Start the ctcc stack.
+2. Run `scripts/zitadel/create-dashboard-oidc-app.sh`.
+3. Paste its output into `apps/saas-app/.env.development.local`.
+4. Run `pnpm dev --port 5180 --strictPort`, because 5173 is often taken by a
+   Docker container.
+5. Open exactly `http://localhost:5180` and log in as `analyst` /
+   `Password1!`.
 
 ---
 
