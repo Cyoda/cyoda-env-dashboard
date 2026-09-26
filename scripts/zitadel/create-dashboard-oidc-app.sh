@@ -31,10 +31,25 @@ if [ ! -s "$PAT_FILE" ]; then
 fi
 PAT=$(cat "$PAT_FILE")
 
-api() { curl -s -H "Authorization: Bearer $PAT" -H 'Content-Type: application/json' "$@"; }
+api() { curl -sS -H "Authorization: Bearer $PAT" -H 'Content-Type: application/json' "$@"; }
 
-PID=$(api -X POST "$Z/management/v1/projects/_search" -d '{}' \
-  | jq -r '.result[]? | select(.name=="ctcc-app") | .id' | head -n1)
+# Runs an API call and validates the response is JSON before anything else touches
+# it, so an unreachable/erroring Zitadel (connection refused, 5xx, empty body) fails
+# loudly here instead of silently masquerading as "not found" or "success" downstream.
+api_json() {
+  local what="$1"; shift
+  local resp
+  resp=$(api "$@")
+  if ! jq -e '.' >/dev/null 2>&1 <<<"$resp"; then
+    echo "ERROR: Zitadel at $Z unreachable or returned a non-JSON response for $what" >&2
+    echo "$resp" >&2
+    exit 1
+  fi
+  printf '%s' "$resp"
+}
+
+RESP=$(api_json "project search" -X POST "$Z/management/v1/projects/_search" -d '{}') || exit 1
+PID=$(jq -r '.result[]? | select(.name=="ctcc-app") | .id' <<<"$RESP" | head -n1)
 if [ -z "$PID" ] || [ "$PID" = "null" ]; then
   echo "ERROR: project ctcc-app not found at $Z (run ctcc's infra/zitadel/seed.sh first)" >&2
   exit 1
@@ -60,13 +75,13 @@ OIDC_CONFIG=$(jq -n \
     idTokenUserinfoAssertion: true
   }')
 
-EXISTING=$(api -X POST "$Z/management/v1/projects/$PID/apps/_search" -d '{}' \
-  | jq -c --arg n "$APP_NAME" '[.result[]? | select(.name==$n)][0] // empty')
+RESP=$(api_json "apps search" -X POST "$Z/management/v1/projects/$PID/apps/_search" -d '{}') || exit 1
+EXISTING=$(jq -c --arg n "$APP_NAME" '[.result[]? | select(.name==$n)][0] // empty' <<<"$RESP")
 
 if [ -n "$EXISTING" ]; then
   APP_ID=$(jq -r '.id' <<<"$EXISTING")
   CLIENT_ID=$(jq -r '.oidcConfig.clientId // empty' <<<"$EXISTING")
-  RESP=$(api -X PUT "$Z/management/v1/projects/$PID/apps/$APP_ID/oidc_config" -d "$OIDC_CONFIG")
+  RESP=$(api_json "oidc_config update" -X PUT "$Z/management/v1/projects/$PID/apps/$APP_ID/oidc_config" -d "$OIDC_CONFIG") || exit 1
   if jq -e 'has("code")' >/dev/null 2>&1 <<<"$RESP" && ! grep -qE 'COMMAND-1m88i|No changes' <<<"$RESP"; then
     echo "ERROR: updating $APP_NAME failed:" >&2
     jq '.' <<<"$RESP" >&2
@@ -74,8 +89,8 @@ if [ -n "$EXISTING" ]; then
   fi
   echo "reused $APP_NAME app $APP_ID (config updated for $DASHBOARD_URL)" >&2
 else
-  RESP=$(api -X POST "$Z/management/v1/projects/$PID/apps/oidc" \
-    -d "$(jq --arg n "$APP_NAME" '. + {name: $n}' <<<"$OIDC_CONFIG")")
+  RESP=$(api_json "app create" -X POST "$Z/management/v1/projects/$PID/apps/oidc" \
+    -d "$(jq --arg n "$APP_NAME" '. + {name: $n}' <<<"$OIDC_CONFIG")") || exit 1
   CLIENT_ID=$(jq -r '.clientId // empty' <<<"$RESP")
   if [ -z "$CLIENT_ID" ]; then
     echo "ERROR: creating $APP_NAME failed:" >&2
