@@ -13,6 +13,11 @@ const REASON_NOTICES: Record<string, { type: 'info' | 'warning'; text: string }>
   expired: { type: 'info', text: 'Your session expired. Please log in again.' },
   rejected: {
     type: 'warning',
+    text: 'The server rejected your credentials. Please log in again.',
+  },
+  // When OIDC is the only way in, the likely cause is backend trust configuration.
+  rejectedOidc: {
+    type: 'warning',
     text: 'The server rejected your credentials. If this persists, check that the backend trusts this identity provider.',
   },
 };
@@ -32,7 +37,8 @@ const Login: React.FC = () => {
   const showPasswordForm = !HelperFeatureFlags.isCyodaGo();
   const showOidc = isOidcEnabled();
   const displayName = getOidcDisplayName();
-  const notice = REASON_NOTICES[searchParams.get('reason') ?? ''];
+  const reason = searchParams.get('reason') ?? '';
+  const notice = REASON_NOTICES[reason === 'rejected' && showOidc && !showPasswordForm ? 'rejectedOidc' : reason];
 
   // A back-forward-cache restore after starting the redirect must not leave the button spinning.
   useEffect(() => {

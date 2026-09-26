@@ -178,7 +178,8 @@ This matters because today Go mode lands on `/reporting/reports`, a route that i
 - The "OR" divider appears only when both the form and the button are shown.
 - If neither is available (Go mode without OIDC config), an antd `Alert` explains that `VITE_APP_OIDC_*` must be configured.
 - `?reason=expired` shows an info `Alert`: "Your session expired. Please log in again."
-- `?reason=rejected` shows a warning `Alert`: "The server rejected your credentials. If this persists, check that the backend trusts this identity provider."
+- `?reason=rejected` shows a warning `Alert`. When OIDC is the only login (Go mode), it reads "The server rejected your credentials. If this persists, check that the backend trusts this identity provider."; when the password form is available, it reads "The server rejected your credentials. Please log in again."
+- `logout()` suppresses `redirectToLogin` (from `@cyoda/http-api-react`) from the moment it clears the session. A 401 from a request still in flight therefore can't override the navigation to the IdP. It re-enables the redirect when the logout ends up `'local'`.
 - All `useAuth0` usage goes, including the Auth0 redirect effect.
 
 Other files:

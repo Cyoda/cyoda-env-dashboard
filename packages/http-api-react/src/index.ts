@@ -32,3 +32,6 @@ export { default as axios, axiosPublic, axiosPlatform, axiosProcessing, axiosGra
 // Export token refresh registry
 export * from './config/tokenRefresh';
 
+// Export login-redirect control (used while ending a session)
+export { suppressLoginRedirect, resumeLoginRedirect, isLoginRedirectSuppressed } from './config/redirect';
+
