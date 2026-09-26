@@ -207,7 +207,7 @@ Other files:
 | `.devcontainer/devcontainer.json` (Auth0 appears only in comments) | update the comments |
 | `tools/backend-mock-server/server.mjs` mock `/api/auth/login/auth0` endpoint | delete |
 | `apps/saas-app/test-backend-connection.sh` Auth0 section | delete |
-| `apps/saas-app/src/pages/Login.scss` Auth0 button styles | rename to generic `.oidc-login-button` styles |
+| `apps/saas-app/src/pages/Login.scss` Auth0 button styles | change the `// Auth0 button` comments to SSO wording; the `.ant-btn-default` selector is already generic |
 | `apps/saas-app/src/components/RefineLayout.tsx` and `RefineLayout.scss` (dead), and the `@refinedev` stubs in `apps/saas-app/src/cobi-react.d.ts` | delete |
 | Local, gitignored `apps/saas-app/.env` and `.env.development.local` | migrate on the developer's machine (these changes don't appear in the diff) |
 
