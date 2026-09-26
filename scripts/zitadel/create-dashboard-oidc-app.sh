@@ -48,7 +48,22 @@ api_json() {
   printf '%s' "$resp"
 }
 
+# A search response can be valid JSON and still be a Zitadel error envelope, e.g.
+# {"code":7,"message":"permission denied"} for a permission failure or a bogus
+# project id. Zitadel's success shape for _search has no "code" field (an empty
+# match is {"details":{...}} with no "result" key at all), so has("code") is the
+# reliable discriminator between an error and a (possibly empty) result set.
+check_search_ok() {
+  local what="$1" resp="$2"
+  if jq -e 'has("code")' >/dev/null 2>&1 <<<"$resp"; then
+    echo "ERROR: $what failed:" >&2
+    jq '.' <<<"$resp" >&2
+    exit 1
+  fi
+}
+
 RESP=$(api_json "project search" -X POST "$Z/management/v1/projects/_search" -d '{}') || exit 1
+check_search_ok "project search" "$RESP"
 PID=$(jq -r '.result[]? | select(.name=="ctcc-app") | .id' <<<"$RESP" | head -n1)
 if [ -z "$PID" ] || [ "$PID" = "null" ]; then
   echo "ERROR: project ctcc-app not found at $Z (run ctcc's infra/zitadel/seed.sh first)" >&2
@@ -76,6 +91,7 @@ OIDC_CONFIG=$(jq -n \
   }')
 
 RESP=$(api_json "apps search" -X POST "$Z/management/v1/projects/$PID/apps/_search" -d '{}') || exit 1
+check_search_ok "apps search" "$RESP"
 EXISTING=$(jq -c --arg n "$APP_NAME" '[.result[]? | select(.name==$n)][0] // empty' <<<"$RESP")
 
 if [ -n "$EXISTING" ]; then
