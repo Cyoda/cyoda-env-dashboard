@@ -2,11 +2,15 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResp
 import { HelperStorage } from '../utils/storage';
 import { HelperErrors } from '../utils/errors';
 import { serializeParams } from '../utils/serializeParams';
+import { getTokenRefresher } from './tokenRefresh';
+import { redirectToLogin } from './redirect';
 
 // Configure default params serializer
 axios.defaults.paramsSerializer = { serialize: serializeParams };
 
-let refreshAccessTokenPromise: Promise<any> | null = null;
+type RetryableConfig = InternalAxiosRequestConfig & { __isRetryRequest?: boolean; muteErrors?: boolean };
+
+let refreshAccessTokenPromise: Promise<void> | null = null;
 
 const helperStorage = new HelperStorage();
 
@@ -44,80 +48,101 @@ instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 /**
- * Response interceptor - handles errors and token refresh
+ * Bearer token that the failing request carried, if any.
  */
-instance.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    // Don't show errors if muteErrors is set
-    if (!(error.config && (error.config as any).muteErrors)) {
-      HelperErrors.handler(error);
-    }
-    
-    // Handle 401 Unauthorized - attempt token refresh
-    if (error.response?.status === 401 && error.config && !(error.config as any).__isRetryRequest) {
-      if (!refreshAccessTokenPromise) {
-        refreshAccessTokenPromise = refreshAccessToken();
-      }
-      
-      try {
-        await refreshAccessTokenPromise;
-        refreshAccessTokenPromise = null;
-        
-        // Retry the original request
-        (error.config as any).__isRetryRequest = true;
-        const auth = helperStorage.get('auth');
-        const token = auth?.token;
-        
-        if (error.config.headers && token) {
-          error.config.headers.Authorization = `Bearer ${token}`;
-        }
-        
-        return axios.request(error.config);
-      } catch (refreshError) {
-        refreshAccessTokenPromise = null;
-        return Promise.reject(refreshError);
-      }
-    }
-    
-    return Promise.reject(error);
-  }
-);
+function bearerOf(config: InternalAxiosRequestConfig): string | undefined {
+  const header = config.headers?.Authorization ?? config.headers?.authorization;
+  return typeof header === 'string' && header.startsWith('Bearer ') ? header.slice('Bearer '.length) : undefined;
+}
 
 /**
- * Refresh access token
- * Migrated from Vue: .old_project/packages/cyoda-ui-lib/src/stores/auth.ts
+ * Refresh the access token for the current session.
+ * Registered refreshers (e.g. OIDC) take precedence; otherwise the legacy
+ * /auth/token flow is used (migrated from Vue: cyoda-ui-lib/src/stores/auth.ts).
+ * On failure: clear auth and go to /login, with ?reason=expired only when a
+ * session existed.
  */
-async function refreshAccessToken(): Promise<void> {
+async function refreshAccessToken(failedToken?: string): Promise<void> {
+  const auth = helperStorage.get('auth');
   try {
-    const auth = helperStorage.get('auth');
-    const refreshToken = auth?.refreshToken;
+    const entry = getTokenRefresher(auth?.type);
+    if (entry) {
+      await entry.refresh(failedToken);
+      return;
+    }
 
+    const refreshToken = auth?.refreshToken;
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
 
-    // Use /auth/token endpoint with GET request and Bearer token in header
-    // This matches the Vue implementation
     const response = await axiosPublic.get('/auth/token', {
       headers: {
-        'Authorization': `Bearer ${refreshToken}`,
+        Authorization: `Bearer ${refreshToken}`,
       },
     });
 
-    const newAuth = {
-      ...auth,
-      token: response.data.token,
-    };
-
-    helperStorage.set('auth', newAuth);
+    helperStorage.set('auth', { ...auth, token: response.data.token });
   } catch (error) {
-    // Clear auth and redirect to login
     helperStorage.remove('auth');
-    window.location.href = '/login';
+    redirectToLogin(auth?.token ? 'expired' : undefined);
     throw error;
   }
 }
+
+/**
+ * Shared 401 handling for every token-bearing instance: single-flight refresh,
+ * one retry, and a loop guard when the backend rejects the refreshed token.
+ */
+export async function handle401(error: AxiosError): Promise<AxiosResponse> {
+  const config = error.config as RetryableConfig;
+  // Snapshot before anything is removed, so the loop guard can still find the hook.
+  const entry = getTokenRefresher(helperStorage.get('auth')?.type);
+
+  if (!refreshAccessTokenPromise) {
+    refreshAccessTokenPromise = refreshAccessToken(bearerOf(config)).finally(() => {
+      refreshAccessTokenPromise = null;
+    });
+  }
+  await refreshAccessTokenPromise;
+
+  config.__isRetryRequest = true;
+  const token = helperStorage.get('auth')?.token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  try {
+    // Global axios has none of these interceptors, so this cannot recurse.
+    return await axios.request(config);
+  } catch (retryError) {
+    if ((retryError as AxiosError)?.response?.status === 401) {
+      helperStorage.remove('auth');
+      await entry?.clearSession?.();
+      redirectToLogin('rejected');
+    }
+    throw retryError;
+  }
+}
+
+/**
+ * Response error handler shared by the token-bearing instances.
+ */
+async function onResponseError(error: AxiosError): Promise<AxiosResponse> {
+  const config = error.config as RetryableConfig | undefined;
+  if (!config?.muteErrors) {
+    HelperErrors.handler(error);
+  }
+  if (error.response?.status === 401 && config && !config.__isRetryRequest) {
+    return handle401(error);
+  }
+  return Promise.reject(error);
+}
+
+/**
+ * Response interceptor - handles errors and token refresh
+ */
+instance.interceptors.response.use((response: AxiosResponse) => response, onResponseError);
 
 /**
  * Public axios instance (no auth required)
@@ -154,43 +179,7 @@ axiosPlatform.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-axiosPlatform.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    // Don't show errors if muteErrors is set
-    if (!(error.config && (error.config as any).muteErrors)) {
-      HelperErrors.handler(error);
-    }
-
-    // Handle 401 Unauthorized - attempt token refresh
-    if (error.response?.status === 401 && error.config && !(error.config as any).__isRetryRequest) {
-      if (!refreshAccessTokenPromise) {
-        refreshAccessTokenPromise = refreshAccessToken();
-      }
-
-      try {
-        await refreshAccessTokenPromise;
-        refreshAccessTokenPromise = null;
-
-        // Retry the original request
-        (error.config as any).__isRetryRequest = true;
-        const auth = helperStorage.get('auth');
-        const token = auth?.token;
-
-        if (error.config.headers && token) {
-          error.config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        return axios.request(error.config);
-      } catch (refreshError) {
-        refreshAccessTokenPromise = null;
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
+axiosPlatform.interceptors.response.use((response: AxiosResponse) => response, onResponseError);
 
 /**
  * Processing API axios instance
@@ -213,43 +202,7 @@ axiosProcessing.interceptors.request.use((config: InternalAxiosRequestConfig) =>
   return config;
 });
 
-axiosProcessing.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    // Don't show errors if muteErrors is set
-    if (!(error.config && (error.config as any).muteErrors)) {
-      HelperErrors.handler(error);
-    }
-
-    // Handle 401 Unauthorized - attempt token refresh
-    if (error.response?.status === 401 && error.config && !(error.config as any).__isRetryRequest) {
-      if (!refreshAccessTokenPromise) {
-        refreshAccessTokenPromise = refreshAccessToken();
-      }
-
-      try {
-        await refreshAccessTokenPromise;
-        refreshAccessTokenPromise = null;
-
-        // Retry the original request
-        (error.config as any).__isRetryRequest = true;
-        const auth = helperStorage.get('auth');
-        const token = auth?.token;
-
-        if (error.config.headers && token) {
-          error.config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        return axios.request(error.config);
-      } catch (refreshError) {
-        refreshAccessTokenPromise = null;
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
+axiosProcessing.interceptors.response.use((response: AxiosResponse) => response, onResponseError);
 
 /**
  * Grafana API axios instance
@@ -265,40 +218,13 @@ export const axiosGrafana: AxiosInstance = axios.create({
   },
 });
 
+// Grafana uses basic auth: a 401 says nothing about the cyoda token, so never refresh.
 axiosGrafana.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
-    // Don't show errors if muteErrors is set
-    if (!(error.config && (error.config as any).muteErrors)) {
+    if (!(error.config as RetryableConfig | undefined)?.muteErrors) {
       HelperErrors.handler(error);
     }
-
-    // Handle 401 Unauthorized - attempt token refresh
-    if (error.response?.status === 401 && error.config && !(error.config as any).__isRetryRequest) {
-      if (!refreshAccessTokenPromise) {
-        refreshAccessTokenPromise = refreshAccessToken();
-      }
-
-      try {
-        await refreshAccessTokenPromise;
-        refreshAccessTokenPromise = null;
-
-        // Retry the original request
-        (error.config as any).__isRetryRequest = true;
-        const auth = helperStorage.get('auth');
-        const token = auth?.token;
-
-        if (error.config.headers && token) {
-          error.config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        return axios.request(error.config);
-      } catch (refreshError) {
-        refreshAccessTokenPromise = null;
-        return Promise.reject(refreshError);
-      }
-    }
-
     return Promise.reject(error);
   }
 );
@@ -324,43 +250,7 @@ axiosAI.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-axiosAI.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    // Don't show errors if muteErrors is set
-    if (!(error.config && (error.config as any).muteErrors)) {
-      HelperErrors.handler(error);
-    }
-
-    // Handle 401 Unauthorized - attempt token refresh
-    if (error.response?.status === 401 && error.config && !(error.config as any).__isRetryRequest) {
-      if (!refreshAccessTokenPromise) {
-        refreshAccessTokenPromise = refreshAccessToken();
-      }
-
-      try {
-        await refreshAccessTokenPromise;
-        refreshAccessTokenPromise = null;
-
-        // Retry the original request
-        (error.config as any).__isRetryRequest = true;
-        const auth = helperStorage.get('auth');
-        const token = auth?.token;
-
-        if (error.config.headers && token) {
-          error.config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        return axios.request(error.config);
-      } catch (refreshError) {
-        refreshAccessTokenPromise = null;
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
+axiosAI.interceptors.response.use((response: AxiosResponse) => response, onResponseError);
 
 export default instance;
 

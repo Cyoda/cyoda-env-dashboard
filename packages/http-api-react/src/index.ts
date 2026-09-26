@@ -29,3 +29,6 @@ export * from './components';
 // Export axios instances
 export { default as axios, axiosPublic, axiosPlatform, axiosProcessing, axiosGrafana, axiosAI } from './config/axios';
 
+// Export token refresh registry
+export * from './config/tokenRefresh';
+
