@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.BASE_URL ?? 'http://localhost:5173';
+// Start the dev server on the port BASE_URL points at.
+const port = new URL(baseURL).port || '5173';
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -18,7 +22,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
+    baseURL,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
@@ -37,7 +41,7 @@ export default defineConfig({
       testMatch: '**/*.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
-        baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
+        baseURL,
       },
     },
     {
@@ -46,15 +50,15 @@ export default defineConfig({
       testMatch: '**/*.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
-        baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
+        baseURL,
       },
     },
   ],
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'cd apps/saas-app && npm run dev',
-    url: process.env.BASE_URL ?? 'http://localhost:5173',
+    command: `cd apps/saas-app && pnpm dev --port ${port} --strictPort`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

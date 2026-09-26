@@ -67,11 +67,19 @@ describe('Login page', () => {
     expect(screen.getByText('Your session expired. Please log in again.')).toBeInTheDocument();
   });
 
-  it('shows the rejected notice', () => {
+  it('shows the rejected notice with the identity-provider hint when OIDC is the only login', () => {
+    vi.spyOn(HelperFeatureFlags, 'isCyodaGo').mockReturnValue(true);
     renderLogin('?reason=rejected');
     expect(
       screen.getByText('The server rejected your credentials. If this persists, check that the backend trusts this identity provider.'),
     ).toBeInTheDocument();
+  });
+
+  it('shows the rejected notice without the identity-provider hint when password login is available', () => {
+    vi.spyOn(HelperFeatureFlags, 'isCyodaGo').mockReturnValue(false);
+    renderLogin('?reason=rejected');
+    expect(screen.getByText('The server rejected your credentials. Please log in again.')).toBeInTheDocument();
+    expect(screen.queryByText(/trusts this identity provider/)).not.toBeInTheDocument();
   });
 
   it('starts the OIDC login and shows the real error when it fails', async () => {

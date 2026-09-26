@@ -7,7 +7,7 @@
  */
 
 import { UserManager, WebStorageStateStore, Log, type User } from 'oidc-client-ts';
-import { HelperStorage } from '@cyoda/http-api-react';
+import { HelperStorage, suppressLoginRedirect, resumeLoginRedirect } from '@cyoda/http-api-react';
 import { getOidcConfig, type OidcConfig } from './oidcConfig';
 
 // DEBUG would log whole token responses; never go below WARN.
@@ -173,6 +173,9 @@ export async function logout(opts: { clearAll?: boolean } = {}): Promise<LogoutR
 
   const idToken = (await um.getUser().catch(() => null))?.id_token;
 
+  // From here on, requests fail with 401; their login redirect must not
+  // override the navigation to the IdP.
+  suppressLoginRedirect();
   await clearSession();
   if (opts.clearAll) {
     helperStorage.clear();
@@ -199,6 +202,7 @@ export async function logout(opts: { clearAll?: boolean } = {}): Promise<LogoutR
     return 'redirecting';
   }
 
+  resumeLoginRedirect();
   return 'local';
 }
 

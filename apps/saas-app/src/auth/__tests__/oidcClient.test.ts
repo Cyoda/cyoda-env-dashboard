@@ -41,6 +41,7 @@ const DEFAULT_CONFIG = {
 };
 
 import { getOidcConfig } from '../oidcConfig';
+import { isLoginRedirectSuppressed, resumeLoginRedirect } from '@cyoda/http-api-react';
 import {
   isOidcEnabled, getOidcDisplayName, startLogin, completeLogin, refreshToken, logout, clearSession, resetOidcClient,
 } from '../oidcClient';
@@ -239,6 +240,7 @@ describe('oidcClient', () => {
 
     beforeEach(async () => {
       await startLogin();
+      resumeLoginRedirect();
       localStorage.setItem('cyoda_auth', JSON.stringify({ token: 'at-1', user: 'analyst', type: 'oidc' }));
       Object.defineProperty(window, 'location', {
         value: { ...window.location, origin: window.location.origin, assign: vi.fn() },
@@ -293,6 +295,23 @@ describe('oidcClient', () => {
 
       await expect(logout()).resolves.toBe('local');
       expect(window.location.assign).not.toHaveBeenCalled();
+    });
+
+    it('suppresses 401 login redirects while heading to the IdP, so they cannot override the end-session navigation', async () => {
+      um().getUser.mockResolvedValue(user());
+      um().metadataService.getEndSessionEndpoint.mockResolvedValue('http://idp/end');
+      um().signoutRedirect.mockReturnValue(new Promise(() => {}));
+
+      await expect(logout()).resolves.toBe('redirecting');
+      expect(isLoginRedirectSuppressed()).toBe(true);
+    });
+
+    it('re-enables login redirects when the logout is local', async () => {
+      um().getUser.mockResolvedValue(user());
+      um().metadataService.getEndSessionEndpoint.mockResolvedValue(undefined);
+
+      await expect(logout()).resolves.toBe('local');
+      expect(isLoginRedirectSuppressed()).toBe(false);
     });
 
     it('uses LOGOUT_URL when discovery fails', async () => {
