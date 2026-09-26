@@ -67,11 +67,6 @@ if [ -f ".env" ]; then
         echo "✗ VITE_APP_BASE_URL is not configured correctly"
     fi
 
-    if grep -q "VITE_APP_AUTH0_DOMAIN" .env; then
-        echo "✓ Auth0 configuration found"
-    else
-        echo "✗ Auth0 configuration not found"
-    fi
 else
     echo "✗ .env file not found"
     echo "  Please create .env file from .env.example"

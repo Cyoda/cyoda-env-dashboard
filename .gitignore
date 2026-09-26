@@ -14,10 +14,11 @@ dist/
 build/
 
 # Environment variables
-# Note: .env.template and .env.development.local.example are templates and should be committed
-# Only actual .env.*.local files should be ignored
+# .env.template and .env*.example files are committed templates/examples;
+# every other .env* file is local and ignored
 .env*
 !.env.template
+!.env*.example
 
 # Ignore .env files in packages (for standalone development)
 packages/*/.env.local

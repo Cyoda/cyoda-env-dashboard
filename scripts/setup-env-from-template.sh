@@ -150,11 +150,6 @@ for package in "${PACKAGES[@]}"; do
     fi
 done
 
-# Also create root .env file if template exists
-if [ -f ".env.template" ]; then
-    create_env_from_template "." "$PRESET"
-fi
-
 echo ""
 echo -e "${GREEN}=========================================${NC}"
 echo -e "${GREEN}  Setup Complete! ✓${NC}"

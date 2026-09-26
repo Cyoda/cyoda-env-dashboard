@@ -1,31 +1,25 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Layout } from 'antd';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AppHeader } from './AppHeader';
 import { LeftSideMenu } from './LeftSideMenu';
-import { HelperStorage } from '@cyoda/http-api-react';
 import { useAppStore } from '@cyoda/cyoda-sass-react';
+import { isValidSession } from '../auth/session';
 import './AppLayout.scss';
 
 const { Content } = Layout;
-const helperStorage = new HelperStorage();
 
 export const AppLayout: React.FC = () => {
   // Use persisted store for menu collapse state
   const isToggledMenu = useAppStore((state) => state.isToggledMenu);
   const toggleMenu = useAppStore((state) => state.toggleMenu);
-  const location = useLocation();
-  const navigate = useNavigate();
+  // Subscribe to navigation so the guard re-runs on every route change.
+  useLocation();
 
-  // Check authentication on mount and location change
-  // Note: Auth0TokenInitializer already handles Auth0 loading state and token saving,
-  // so by the time we get here, if user is Auth0-authenticated, token is already in storage.
-  useEffect(() => {
-    const authData = helperStorage.get('auth');
-    if (!authData || !authData.token) {
-      navigate('/login', { replace: true });
-    }
-  }, [location.pathname, navigate]);
+  // Synchronous guard: never render children (and their API calls) without a session.
+  if (!isValidSession()) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <Layout className="saas-app-layout">

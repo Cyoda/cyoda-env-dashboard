@@ -3,11 +3,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, Spin, theme as antdTheme, App as AntdApp } from 'antd';
 import type { ThemeConfig } from 'antd';
-import { Auth0Provider } from '@auth0/auth0-react';
 import { AppRoutes } from './routes';
-import { auth0Config } from './config/auth0';
 import { ErrorBoundary } from '@cyoda/ui-lib-react';
-import { Auth0TokenInitializer } from './components/Auth0TokenInitializer';
 import { useThemeStore } from './stores/themeStore';
 import './App.scss';
 
@@ -300,25 +297,13 @@ const ThemedApp: React.FC = () => {
 /**
  * Main App Component
  *
- * Structure follows the Vue project pattern:
- * - Auth0Provider at the top level (initialized once, never re-mounts)
- * - No onRedirectCallback - Auth0 SDK handles redirect automatically
- * - Auth0TokenInitializer sets up token refresh capability
+ * OIDC login is handled by src/auth (oidc-client-ts singleton + /oidc/callback
+ * route); no provider component is needed at the top level.
  */
 function App() {
   return (
     <ErrorBoundary>
-      <Auth0Provider
-        domain={auth0Config.domain}
-        clientId={auth0Config.clientId}
-        authorizationParams={auth0Config.authorizationParams}
-        cacheLocation={auth0Config.cacheLocation}
-        useRefreshTokens={auth0Config.useRefreshTokens}
-      >
-        <Auth0TokenInitializer>
-          <ThemedApp />
-        </Auth0TokenInitializer>
-      </Auth0Provider>
+      <ThemedApp />
     </ErrorBoundary>
   );
 }

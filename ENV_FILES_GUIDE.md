@@ -19,11 +19,11 @@ to start without it.
 
 ### Standalone package development (rare)
 
-Copy the root `.env.template` into the package you're working on as
+Start from the SaaS app template, copied into the package you're working on as
 `.env.development.local`:
 
 ```bash
-cp .env.template packages/<package-name>/.env.development.local
+cp apps/saas-app/.env.template packages/<package-name>/.env.development.local
 # edit for your local backend, then:
 pnpm --filter @cyoda/<package-name> dev
 ```
@@ -34,11 +34,10 @@ pnpm --filter @cyoda/<package-name> dev
 
 ```
 cyoda-env-dashboard/
-├── .env.template                           # Template — standalone package dev
-├── .env.template.development.local         # Older template variant (kept for reference)
-│
 ├── apps/saas-app/
 │   ├── .env.template                       # Template for the SaaS app
+│   ├── .env.cloud.example                  # Example: Cyoda Cloud + Auth0 (auth.cyoda.net)
+│   ├── .env.cloud-ai-dev.example           # Example: AI dev backend + Auth0 dev tenant
 │   ├── .env                                # Main config (gitignored)
 │   └── .env.development.local              # Local overrides (gitignored)
 │
@@ -47,9 +46,13 @@ cyoda-env-dashboard/
     │   └── .env.development.local          # Standalone package config (gitignored)
 ```
 
-> `.gitignore` rule: `.env*` is ignored except for `.env.template`. This means
-> `apps/saas-app/.env.template` (and every nested `.env.template`) is **not**
-> whitelisted by the root rule alone — review `.gitignore` before relying on it.
+> `.gitignore` rule: `.env*` is ignored except for `.env.template` and
+> `.env*.example`, at any depth. Templates and examples are committed; every
+> other `.env*` file stays local.
+>
+> The two `.env.cloud*.example` files are real configurations from the (now
+> torn-down) Cyoda Cloud setups, mapped to `VITE_APP_OIDC_*`. Copy one to
+> `apps/saas-app/.env` to start from it.
 
 ---
 
@@ -69,9 +72,11 @@ Typical content:
 VITE_APP_API_BASE=/api
 VITE_APP_API_BASE_PROCESSING=
 VITE_APP_BASE_URL=https://cyoda-develop.kube3.cyoda.org/
-VITE_APP_AUTH0_DOMAIN=auth.cyoda.net
-VITE_APP_AUTH0_CLIENT_ID=<your-client-id>
-VITE_APP_AUTH0_AUDIENCE=https://cloud.cyoda.com/api
+VITE_APP_OIDC_DISPLAY_NAME=Auth0
+VITE_APP_OIDC_ISSUER=https://auth.cyoda.net/
+VITE_APP_OIDC_CLIENT_ID=<your-auth0-spa-client-id>
+VITE_APP_OIDC_EXTRA_PARAMS=audience=https://cloud.cyoda.com/api&organization=<your-auth0-org-id>
+VITE_APP_OIDC_LOGOUT_URL=https://auth.cyoda.net/v2/logout?client_id=<your-auth0-spa-client-id>&returnTo=http%3A%2F%2Flocalhost%3A5173%2Flogin
 # ...
 ```
 
@@ -93,20 +98,6 @@ VITE_FEATURE_FLAG_IS_CYODA_GO=false
 
 ---
 
-## Files NOT used by the SaaS app
-
-### `.env.template` (root)
-
-Template for **standalone package development only**. The SaaS app ignores it
-— Vite loads env files from `apps/saas-app/` when running `pnpm dev`.
-
-### `.env.template.development.local` (root)
-
-Older, equivalent template kept for historical reference. Prefer
-`.env.template`.
-
----
-
 ## How Vite loads `.env` files
 
 ### Running `pnpm dev` (SaaS app)
@@ -121,7 +112,7 @@ earlier ones):
 
 Vite does **not** load:
 
-- `.env.template` or `.env.template.development.local` at the repo root
+- Any `.env*` files at the repo root
 - Any `.env*` files under `packages/*`
 
 ### Running a package standalone
@@ -139,7 +130,7 @@ Vite reads from the package directory, e.g.
 ```bash
 pnpm install
 cp apps/saas-app/.env.template apps/saas-app/.env
-# edit VITE_APP_BASE_URL and Auth0 values
+# edit VITE_APP_BASE_URL and OIDC values
 pnpm dev
 # open http://localhost:5173
 ```
@@ -172,7 +163,7 @@ VITE_FEATURE_FLAG_USE_MODELS_INFO=true
 ### 4. Standalone package development
 
 ```bash
-cp .env.template packages/reporting-react/.env.development.local
+cp apps/saas-app/.env.template packages/reporting-react/.env.development.local
 # edit for your local backend
 pnpm --filter @cyoda/reporting-react dev
 # port for each package: see PORTS.md
@@ -202,6 +193,16 @@ When this flag is set:
 > Business/Technical entity-type toggle has no meaningful "Technical" option
 > in Go mode, since legacy `/platform-*` endpoints aren't reachable).
 
+## OIDC login against ctcc (Zitadel + cyoda-go)
+
+1. Start the ctcc stack.
+2. Run `scripts/zitadel/create-dashboard-oidc-app.sh`.
+3. Paste its output into `apps/saas-app/.env.development.local`.
+4. Run `pnpm dev --port 5180 --strictPort`, because 5173 is often taken by a
+   Docker container.
+5. Open exactly `http://localhost:5180` and log in as `analyst` /
+   `Password1!`.
+
 ---
 
 ## Summary
@@ -209,21 +210,17 @@ When this flag is set:
 | File                                       | Used by              | Purpose           | In git? |
 |--------------------------------------------|----------------------|-------------------|---------|
 | `apps/saas-app/.env`                       | SaaS app             | Main config       | No (.gitignore) |
-| `apps/saas-app/.env.template`              | —                    | Template          | No¹     |
+| `apps/saas-app/.env.template`              | —                    | Template          | Yes     |
+| `apps/saas-app/.env.cloud*.example`        | —                    | Cloud examples    | Yes     |
 | `apps/saas-app/.env.development.local`     | SaaS app             | Local overrides   | No (.gitignore) |
-| `.env.template`                            | Standalone packages  | Template          | Yes (whitelisted) |
-| `.env.template.development.local`          | Standalone packages  | Older template    | No¹     |
 | `packages/*/.env*.local`                   | Standalone packages  | Package config    | No (.gitignore) |
-
-¹ `.gitignore` only whitelists the root `.env.template`; the nested and
-alternate-named templates are ignored by default.
 
 ---
 
 ## Troubleshooting
 
 **My .env changes aren't applied.**
-Make sure you're editing `apps/saas-app/.env` (not the root `.env.template`),
+Make sure you're editing `apps/saas-app/.env` (not a `.env.template` or `.env*.example` file),
 then restart `pnpm dev`. Vite only reads env files at startup.
 
 **`VITE_APP_BASE_URL is not set` on startup.**

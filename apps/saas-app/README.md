@@ -94,9 +94,9 @@ values. Reference for every variable below.
 > every browser that loads the app. There is no such thing as a secret
 > `VITE_*` variable.
 >
-> - **Safe to put behind `VITE_`:** API base URLs, Auth0 client IDs,
->   audiences and organization IDs (Auth0 designs SPA client IDs to be
->   public — security comes from the Allowed Callback URLs and PKCE,
+> - **Safe to put behind `VITE_`:** API base URLs, OIDC client IDs,
+>   audiences and organization IDs (public (PKCE) clients are designed
+>   that way — security comes from the registered redirect URIs and PKCE,
 >   not from hiding the ID), feature flags.
 > - **Never put behind `VITE_`:** API keys, passwords, signing keys,
 >   refresh tokens, database credentials, or anything you wouldn't post
@@ -121,21 +121,40 @@ values. Reference for every variable below.
 | `VITE_PROXY_LOG`               | no       | `true` to log every proxied request to stdout. Defaults to `false`.                                    |
 | `VITE_APP_DEBUG`               | no       | Enable extra debug logging in the app. Defaults to `false`.                                            |
 
-#### Auth0
+#### OIDC login
 
-The app authenticates via Auth0. Get these values from your Cyoda Auth0
-tenant administrator.
+These are build-time Vite env vars. OIDC is on only when both `ISSUER` and
+`CLIENT_ID` are set; otherwise no button is rendered.
 
-| Variable                      | Required | Purpose                                                  |
-|-------------------------------|:--------:|----------------------------------------------------------|
-| `VITE_APP_AUTH0_DOMAIN`       | yes      | Auth0 tenant domain (e.g. `auth.cyoda.net`).             |
-| `VITE_APP_AUTH0_CLIENT_ID`    | yes      | Auth0 application client ID.                             |
-| `VITE_APP_AUTH0_AUDIENCE`     | yes      | Auth0 API audience (e.g. `https://cloud.cyoda.com/api`). |
-| `VITE_APP_AUTH0_ORGANIZATION` | no       | Auth0 organization ID, if your tenant uses orgs.         |
+| Var | Required | Default | Example (ctcc Zitadel) | Notes |
+|---|---|---|---|---|
+| `VITE_APP_OIDC_ISSUER` | yes | — | `http://auth.localtest.me:8081` | Discovery via `{issuer}/.well-known/openid-configuration`. Use the provider's `issuer` value exactly (e.g. Auth0's has a trailing slash). The value becomes part of the stored-user key, so changing it logs users out. |
+| `VITE_APP_OIDC_CLIENT_ID` | yes | — | `3401…@ctcc` | Public client: PKCE, no secret. |
+| `VITE_APP_OIDC_DISPLAY_NAME` | no | `SSO` | `Zitadel` | Button label: "Login with {name}". |
+| `VITE_APP_OIDC_SCOPES` | no | `openid profile email offline_access` | `openid profile email offline_access urn:zitadel:iam:org:project:roles` | Space-separated. Refresh tokens require `offline_access`. |
+| `VITE_APP_OIDC_EXTRA_PARAMS` | no | — | Auth0: `audience=https://cloud.cyoda.com/api&organization=org_…` | Query-string format. It's parsed with `URLSearchParams` and passed as `signinRedirect({ extraQueryParams })`. It is deliberately **not** a `UserManager` setting: `createSignoutRequest` falls back to `settings.extraQueryParams`, which would add these params to the end-session URL. |
+| `VITE_APP_OIDC_LOGOUT_URL` | no | — | Auth0: `https://auth.cyoda.net/v2/logout?client_id=…&returnTo=…` | Used only when the provider has no `end_session_endpoint`. The Auth0 tenant `auth.cyoda.net` doesn't advertise one today. If RP-initiated logout is enabled on the tenant, the endpoint appears and this var isn't needed. |
 
-> The Auth0 application's **Allowed Callback URLs**, **Allowed Logout URLs**
-> and **Allowed Web Origins** must include `http://localhost:5173`, otherwise
-> the login redirect will fail.
+These are fixed and can't be configured — register them at the IdP:
+
+- redirect URI: `{origin}/oidc/callback`
+- post-logout URI: `{origin}/login`
+
+> **Auth0 checklist:** add `{origin}/oidc/callback` to **Allowed Callback
+> URLs**, `{origin}/login` to **Allowed Logout URLs**, and `{origin}` to
+> **Allowed Web Origins**. Refresh-token rotation must stay enabled on the
+> application. "Allow Offline Access" must be on for the API behind
+> `audience`.
+
+##### Auth0 migration
+
+| Old | New |
+|---|---|
+| `VITE_APP_AUTH0_DOMAIN=auth.cyoda.net` | `VITE_APP_OIDC_ISSUER=https://auth.cyoda.net/` |
+| `VITE_APP_AUTH0_CLIENT_ID` | `VITE_APP_OIDC_CLIENT_ID` |
+| `VITE_APP_AUTH0_AUDIENCE`, `VITE_APP_AUTH0_ORGANIZATION` | `VITE_APP_OIDC_EXTRA_PARAMS=audience=…&organization=…` |
+| — | `VITE_APP_OIDC_DISPLAY_NAME=Auth0` |
+| `VITE_APP_AUTH0_REDIRECT_URI` (unused) | removed |
 
 #### Feature flags
 
@@ -194,7 +213,8 @@ This is an alias for `pnpm --filter @cyoda/saas-app dev`, which runs
 ```
 
 Open **http://localhost:5173** in your browser. You will be redirected to
-Auth0 to log in, then dropped on `/workflows` (the default route).
+the configured OIDC provider (or username/password) to log in, then dropped
+on `/workflows` (the default route).
 
 To stop the dev server: `Ctrl+C`.
 
@@ -274,15 +294,14 @@ apps/saas-app/
 ├── index.html
 ├── public/
 ├── src/
-│   ├── main.tsx                  # Entry point, Auth0 + QueryClient setup
+│   ├── main.tsx                  # Entry point; registers the OIDC token refresher
 │   ├── App.tsx                   # Top-level providers
 │   ├── components/
 │   │   ├── AppLayout.tsx         # Outer layout (sidebar + content)
 │   │   ├── AppHeader.tsx         # Header with entity-type toggle
 │   │   ├── LeftSideMenu.tsx      # Navigation tree
-│   │   ├── Auth0TokenInitializer.tsx
-│   │   ├── RefineLayout.tsx
 │   │   └── dialogs/
+│   ├── auth/                     # OIDC client, callback page, session helpers
 │   ├── pages/
 │   │   ├── Home.tsx
 │   │   └── Login.tsx
@@ -361,9 +380,10 @@ corepack prepare pnpm@9.15.4 --activate
 pnpm -v  # must print 9.15.4 (or whatever packageManager pins)
 ```
 
-**Login redirects fail / Auth0 error in browser**
-The Auth0 application must allow `http://localhost:5173` as a callback,
-logout URL and web origin. Check the Auth0 dashboard.
+**OIDC login redirect fails**
+The IdP must allow `{origin}/oidc/callback` as redirect URI, `{origin}/login`
+as post-logout URI, and `{origin}` as a web origin. Open the app on exactly
+that origin (`localhost`, not `127.0.0.1`).
 
 **Stale dependencies after a pull**
 ```bash

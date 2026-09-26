@@ -115,20 +115,5 @@ describe('Login', () => {
 
     consoleSpy.mockRestore()
   })
-
-  it('renders Auth0 button when showAuth0Button is true', () => {
-    const auth0Button = <button>Login with Auth0</button>
-    renderLogin({
-      showAuth0Button: true,
-      auth0ButtonComponent: auth0Button
-    })
-
-    expect(screen.getByText('Login with Auth0')).toBeInTheDocument()
-  })
-
-  it('does not render Auth0 button by default', () => {
-    renderLogin()
-    expect(screen.queryByText('Login with Auth0')).not.toBeInTheDocument()
-  })
 })
 

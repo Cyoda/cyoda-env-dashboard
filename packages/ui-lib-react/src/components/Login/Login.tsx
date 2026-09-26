@@ -12,8 +12,6 @@ export interface LoginFormData {
 export interface LoginProps {
   onLogin?: (formData: LoginFormData) => Promise<void>
   loading?: boolean
-  showAuth0Button?: boolean
-  auth0ButtonComponent?: React.ReactNode
 }
 
 /**
@@ -22,12 +20,7 @@ export interface LoginProps {
  * 
  * Migrated from Vue: .old_project/packages/cyoda-ui-lib/src/components-library/elements/Login/Login.vue
  */
-export const Login: React.FC<LoginProps> = ({
-  onLogin,
-  loading: externalLoading,
-  showAuth0Button = false,
-  auth0ButtonComponent
-}) => {
+export const Login: React.FC<LoginProps> = ({ onLogin, loading: externalLoading }) => {
   const [form] = Form.useForm()
   const navigate = useNavigate()
   const [internalLoading, setInternalLoading] = useState(false)
@@ -98,12 +91,6 @@ export const Login: React.FC<LoginProps> = ({
             >
               Login
             </Button>
-            
-            {showAuth0Button && auth0ButtonComponent && (
-              <div className="auth0-button-wrapper">
-                {auth0ButtonComponent}
-              </div>
-            )}
           </div>
         </Form>
       </Col>

@@ -4,9 +4,9 @@
 //   - No local Node, pnpm, or Corepack install required on the host —
 //     everything runs inside a container with the right toolchain pinned.
 //
-// Auth0:
-//   - The Auth0 application must have http://localhost:5173 in its
-//     Allowed Callback URLs (and Allowed Logout URLs / Web Origins).
+// OIDC login: the IdP must allow http://localhost:5173/oidc/callback as
+//   redirect URI, http://localhost:5173/login as post-logout URI, and
+//   origin http://localhost:5173.
 //
 // What you still need on the host:
 //   - Docker Desktop (or OrbStack on macOS)
@@ -18,7 +18,7 @@
 //   3. Wait for the image to pull and `pnpm install` to finish.
 //   4. In the integrated terminal:
 //        cp apps/saas-app/.env.template apps/saas-app/.env
-//        # edit the file, fill in VITE_APP_BASE_URL and the Auth0 values
+//        # edit the file, fill in VITE_APP_BASE_URL and the VITE_APP_OIDC_* values
 //        pnpm dev
 //   5. Click the forwarded-port toast (or open http://localhost:5173).
 //

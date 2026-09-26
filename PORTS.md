@@ -13,6 +13,10 @@ package's `dev` script overrides it, in that script in `package.json`.
 `http://localhost:5173` is the canonical URL for the Cyoda Env Dashboard during
 local development. The port is set explicitly in `apps/saas-app/vite.config.ts`.
 
+`5180` is used ad hoc for OIDC testing against the ctcc stack (`pnpm dev
+--port 5180 --strictPort`); it is the default `DASHBOARD_URL` of
+`scripts/zitadel/create-dashboard-oidc-app.sh`.
+
 ## Packages (standalone development)
 
 Each package with its own dev server can be run standalone. Use this when
@@ -47,7 +51,7 @@ libraries with no standalone dev server.
 ## Rules
 
 1. **Do not change `apps/saas-app`'s port.** `5173` is the canonical local URL
-   and is referenced by tests, Auth0 callback URLs, and developer bookmarks.
+   and is referenced by tests, OIDC redirect URIs, and developer bookmarks.
 2. **No two workspaces may share a port.** When adding a new package, pick an
    unused port from this file and update the table.
 3. **Standalone packages do not collide with the app.** You can run
