@@ -19,11 +19,11 @@ to start without it.
 
 ### Standalone package development (rare)
 
-Copy the root `.env.template` into the package you're working on as
+Start from the SaaS app template, copied into the package you're working on as
 `.env.development.local`:
 
 ```bash
-cp .env.template packages/<package-name>/.env.development.local
+cp apps/saas-app/.env.template packages/<package-name>/.env.development.local
 # edit for your local backend, then:
 pnpm --filter @cyoda/<package-name> dev
 ```
@@ -34,9 +34,6 @@ pnpm --filter @cyoda/<package-name> dev
 
 ```
 cyoda-env-dashboard/
-├── .env.template                           # Template — standalone package dev
-├── .env.template.development.local         # Older template variant (kept for reference)
-│
 ├── apps/saas-app/
 │   ├── .env.template                       # Template for the SaaS app
 │   ├── .env.cloud.example                  # Example: Cyoda Cloud + Auth0 (auth.cyoda.net)
@@ -101,20 +98,6 @@ VITE_FEATURE_FLAG_IS_CYODA_GO=false
 
 ---
 
-## Files NOT used by the SaaS app
-
-### `.env.template` (root)
-
-Template for **standalone package development only**. The SaaS app ignores it
-— Vite loads env files from `apps/saas-app/` when running `pnpm dev`.
-
-### `.env.template.development.local` (root)
-
-Older, equivalent template kept for historical reference. Prefer
-`.env.template`.
-
----
-
 ## How Vite loads `.env` files
 
 ### Running `pnpm dev` (SaaS app)
@@ -129,7 +112,7 @@ earlier ones):
 
 Vite does **not** load:
 
-- `.env.template` or `.env.template.development.local` at the repo root
+- Any `.env*` files at the repo root
 - Any `.env*` files under `packages/*`
 
 ### Running a package standalone
@@ -180,7 +163,7 @@ VITE_FEATURE_FLAG_USE_MODELS_INFO=true
 ### 4. Standalone package development
 
 ```bash
-cp .env.template packages/reporting-react/.env.development.local
+cp apps/saas-app/.env.template packages/reporting-react/.env.development.local
 # edit for your local backend
 pnpm --filter @cyoda/reporting-react dev
 # port for each package: see PORTS.md
@@ -230,19 +213,14 @@ When this flag is set:
 | `apps/saas-app/.env.template`              | —                    | Template          | Yes     |
 | `apps/saas-app/.env.cloud*.example`        | —                    | Cloud examples    | Yes     |
 | `apps/saas-app/.env.development.local`     | SaaS app             | Local overrides   | No (.gitignore) |
-| `.env.template`                            | Standalone packages  | Template          | Yes (whitelisted) |
-| `.env.template.development.local`          | Standalone packages  | Older template    | No¹     |
 | `packages/*/.env*.local`                   | Standalone packages  | Package config    | No (.gitignore) |
-
-¹ `.gitignore` whitelists only files named exactly `.env.template` or matching
-`.env*.example`; alternate-named templates like this one stay ignored.
 
 ---
 
 ## Troubleshooting
 
 **My .env changes aren't applied.**
-Make sure you're editing `apps/saas-app/.env` (not the root `.env.template`),
+Make sure you're editing `apps/saas-app/.env` (not a `.env.template` or `.env*.example` file),
 then restart `pnpm dev`. Vite only reads env files at startup.
 
 **`VITE_APP_BASE_URL is not set` on startup.**
