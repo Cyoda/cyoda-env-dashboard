@@ -41,6 +41,7 @@ const EventView = React.lazy(() => import('@cyoda/processing-manager-react').the
 
 // Login page - not lazy-loaded to avoid flash on initial load
 import Login from '../pages/Login';
+import { OidcCallback } from '../auth/OidcCallback';
 
 export const AppRoutes: React.FC = () => {
   const isTrinoEnabled = HelperFeatureFlags.isTrinoSqlSchemaEnabled();
@@ -53,6 +54,7 @@ export const AppRoutes: React.FC = () => {
     <Routes>
       {/* Login Route */}
       <Route path="/login" element={<Login />} />
+      <Route path="/oidc/callback" element={<OidcCallback />} />
 
       {/* Main App Routes with Layout */}
       <Route path="/" element={<AppLayout />}>

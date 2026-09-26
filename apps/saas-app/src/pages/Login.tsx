@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Form, Input, Button, Card, App, Divider } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Form, Input, Button, Card, App, Divider, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { useAuth0 } from '@auth0/auth0-react';
 import { login, HelperStorage, HelperFeatureFlags } from '@cyoda/http-api-react';
+import { isOidcEnabled, getOidcDisplayName, startLogin } from '../auth/oidcClient';
+import { getDefaultRoute } from '../utils/defaultRoute';
 import './Login.scss';
 
 const helperStorage = new HelperStorage();
 
-// Determine default route based on feature flags
-const getDefaultRoute = () => {
-  return HelperFeatureFlags.isTrinoSqlSchemaEnabled() ? '/trino' : '/reporting/reports';
+const REASON_NOTICES: Record<string, { type: 'info' | 'warning'; text: string }> = {
+  expired: { type: 'info', text: 'Your session expired. Please log in again.' },
+  rejected: {
+    type: 'warning',
+    text: 'The server rejected your credentials. If this persists, check that the backend trusts this identity provider.',
+  },
 };
 
 interface LoginFormValues {
@@ -20,34 +24,22 @@ interface LoginFormValues {
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [oidcLoading, setOidcLoading] = useState(false);
   const { message } = App.useApp();
-  const { loginWithRedirect, isAuthenticated, isLoading: auth0Loading } = useAuth0();
 
-  // Track if we've already handled Auth0 login to prevent duplicate redirects
-  const hasHandledAuth0Login = useRef(false);
+  const showPasswordForm = !HelperFeatureFlags.isCyodaGo();
+  const showOidc = isOidcEnabled();
+  const displayName = getOidcDisplayName();
+  const notice = REASON_NOTICES[searchParams.get('reason') ?? ''];
 
-  /**
-   * Handle Auth0 authentication redirect.
-   * Token saving is handled by Auth0TokenInitializer at the app level.
-   * This effect just handles navigation after successful auth.
-   */
+  // A back-forward-cache restore after starting the redirect must not leave the button spinning.
   useEffect(() => {
-    // Skip if Auth0 is still initializing, not authenticated, or already handled
-    if (auth0Loading || !isAuthenticated || hasHandledAuth0Login.current) {
-      return;
-    }
-
-    // Only redirect if we have a valid backend token
-    const authData = helperStorage.get('auth');
-    if (!authData?.token) {
-      console.log('Auth0 authenticated but no backend token - staying on login');
-      return;
-    }
-
-    hasHandledAuth0Login.current = true;
-    navigate(getDefaultRoute(), { replace: true });
-  }, [isAuthenticated, auth0Loading, navigate]);
+    const reset = () => setOidcLoading(false);
+    window.addEventListener('pageshow', reset);
+    return () => window.removeEventListener('pageshow', reset);
+  }, []);
 
   // Standard username/password login
   const onFinish = async (values: LoginFormValues) => {
@@ -75,9 +67,14 @@ const Login: React.FC = () => {
     }
   };
 
-  // Auth0 login - just redirect, the useEffect handles the callback
-  const handleAuth0Login = () => {
-    loginWithRedirect();
+  const handleOidcLogin = () => {
+    setOidcLoading(true);
+    startLogin()
+      .catch((err: unknown) => {
+        const reason = err instanceof Error ? err.message : String(err);
+        message.error(`Login with ${displayName} failed: ${reason}`);
+      })
+      .finally(() => setOidcLoading(false));
   };
 
   return (
@@ -94,60 +91,79 @@ const Login: React.FC = () => {
         </div>
 
         <Card className="login-card" variant="borderless">
-          <Form
-            name="login"
-            onFinish={onFinish}
-            autoComplete="off"
-            layout="vertical"
-          >
-            <Form.Item
-              name="username"
-              rules={[{ required: true, message: 'Please input your username!' }]}
-            >
-              <Input
-                prefix={<UserOutlined />}
-                placeholder="Username"
-                size="large"
-              />
-            </Form.Item>
+          {notice && (
+            <Alert type={notice.type} message={notice.text} showIcon style={{ marginBottom: 24 }} />
+          )}
 
-            <Form.Item
-              name="password"
-              rules={[{ required: true, message: 'Please input your password!' }]}
-            >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder="Password"
-                size="large"
-              />
-            </Form.Item>
+          {!showPasswordForm && !showOidc && (
+            <Alert
+              type="error"
+              showIcon
+              message="No login method is configured"
+              description="This build runs against cyoda-go, which needs OIDC login. Set VITE_APP_OIDC_* (see ENV_FILES_GUIDE.md)."
+            />
+          )}
 
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={loading}
-                size="large"
-                block
+          {showPasswordForm && (
+            <Form
+              name="login"
+              onFinish={onFinish}
+              autoComplete="off"
+              layout="vertical"
+            >
+              <Form.Item
+                name="username"
+                rules={[{ required: true, message: 'Please input your username!' }]}
               >
-                Log in
-              </Button>
-            </Form.Item>
+                <Input
+                  prefix={<UserOutlined />}
+                  placeholder="Username"
+                  size="large"
+                />
+              </Form.Item>
 
+              <Form.Item
+                name="password"
+                rules={[{ required: true, message: 'Please input your password!' }]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder="Password"
+                  size="large"
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                  size="large"
+                  block
+                >
+                  Log in
+                </Button>
+              </Form.Item>
+            </Form>
+          )}
+
+          {showPasswordForm && showOidc && (
             <Divider style={{ margin: '24px 0' }}>
               <span style={{ fontSize: '13px' }}>OR</span>
             </Divider>
+          )}
 
+          {showOidc && (
             <Button
               type="default"
               size="large"
               block
-              loading={auth0Loading}
-              onClick={handleAuth0Login}
+              loading={oidcLoading}
+              onClick={handleOidcLogin}
             >
-              Login with Auth0
+              Login with {displayName}
             </Button>
-          </Form>
+          )}
         </Card>
 
         <div className="login-footer">
@@ -159,4 +175,3 @@ const Login: React.FC = () => {
 };
 
 export default Login;
-
