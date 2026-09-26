@@ -14,6 +14,7 @@ vi.mock('oidc-client-ts', () => {
     signinRedirect = vi.fn();
     signinRedirectCallback = vi.fn();
     signinSilent = vi.fn();
+    storeUser = vi.fn().mockResolvedValue(undefined);
     signoutRedirect = vi.fn().mockResolvedValue(undefined);
     metadataService = { getEndSessionEndpoint: vi.fn() };
     constructor(settings: any) {
@@ -118,6 +119,33 @@ describe('oidcClient', () => {
       expect(b).toBe('at-2');
       expect(um().signinSilent).toHaveBeenCalledTimes(1);
       expect(auth().token).toBe('at-2');
+    });
+
+    it('omits scope from the refresh request by storing the user without scope before signinSilent', async () => {
+      um().getUser.mockResolvedValue(user({ scope: 'openid offline_access urn:x' }));
+      um().signinSilent.mockResolvedValue(user({ access_token: 'at-2', refresh_token: 'rt-2' }));
+
+      await refreshToken('at-1');
+
+      expect(um().storeUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: undefined,
+          access_token: 'at-1',
+          refresh_token: 'rt-1',
+        }),
+      );
+      expect(um().storeUser.mock.invocationCallOrder[0]).toBeLessThan(
+        um().signinSilent.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('does not store the user when it has no scope', async () => {
+      um().getUser.mockResolvedValue(user());
+      um().signinSilent.mockResolvedValue(user({ access_token: 'at-2', refresh_token: 'rt-2' }));
+
+      await refreshToken('at-1');
+
+      expect(um().storeUser).not.toHaveBeenCalled();
     });
 
     it('reuses a token another tab already stored, without calling the IdP', async () => {

@@ -112,6 +112,13 @@ async function doRefresh(failedToken?: string): Promise<string> {
     throw new Error('No refresh token available');
   }
 
+  if (before.scope) {
+    // Zitadel rejects some previously-granted scopes (e.g. the roles scope)
+    // on refresh; omitting `scope` keeps the original grant (RFC 6749 §6).
+    before.scope = undefined;
+    await um.storeUser(before);
+  }
+
   try {
     const user = await um.signinSilent();
     if (!user) {
