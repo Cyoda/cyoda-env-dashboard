@@ -10,19 +10,8 @@ declare module '@cyoda/cobi-react' {
   export type ColumnInfo = any
 }
 
-// @refinedev/* and @cyoda/ui are referenced by a few saas-app views but not
-// installed at the workspace level — stub so tsc doesn't fail on the imports.
-declare module '@refinedev/core' {
-  export type AuthProvider = any
-  export type DataProvider = any
-}
-
-declare module '@refinedev/antd' {
-  export const ThemedLayoutV2: any
-  export const ThemedHeaderV2: any
-  export const ThemedTitleV2: any
-}
-
+// @cyoda/ui is referenced by a few saas-app views but not installed at the
+// workspace level — stub so tsc doesn't fail on the import.
 declare module '@cyoda/ui' {
   export const CodeEditor: any
 }

@@ -69,7 +69,6 @@
     "dompurify": "^3.2.4"
   },
   "dependencies": {
-    "@auth0/auth0-react": "^2.8.0",
     "cytoscape": "^3.33.1",
     "event-source-polyfill": "^1.0.31",
     "file-saver": "^2.0.5",

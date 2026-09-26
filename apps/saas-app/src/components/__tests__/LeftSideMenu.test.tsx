@@ -8,13 +8,22 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { LeftSideMenu } from '../LeftSideMenu';
 
+const storageMock = vi.hoisted(() => ({
+  get: vi.fn(() => null as any),
+  remove: vi.fn(),
+  clear: vi.fn(),
+}));
+
 // Mock the storage helper
 vi.mock('@cyoda/http-api-react/utils/storage', () => ({
-  HelperStorage: vi.fn().mockImplementation(() => ({
-    remove: vi.fn(),
-    clear: vi.fn(),
-  })),
+  HelperStorage: vi.fn().mockImplementation(() => storageMock),
 }));
+
+const oidcMock = vi.hoisted(() => ({
+  isOidcEnabled: vi.fn(() => false),
+  logout: vi.fn(async (): Promise<'redirecting' | 'local'> => 'local'),
+}));
+vi.mock('../../auth/oidcClient', () => oidcMock);
 
 // Mock the AppLogo component
 vi.mock('@cyoda/ui-lib-react', () => ({
@@ -463,6 +472,37 @@ describe('LeftSideMenu', () => {
       expect(screen.getByText('Reporting')).toBeInTheDocument();
       expect(screen.getByText('Tasks')).toBeInTheDocument();
       expect(screen.getByText('Processing')).toBeInTheDocument();
+    });
+  });
+
+  describe('OIDC logout', () => {
+    beforeEach(() => {
+      oidcMock.isOidcEnabled.mockReturnValue(true);
+      oidcMock.logout.mockReset();
+      storageMock.get.mockReturnValue({ token: 't', user: 'u', type: 'oidc' });
+    });
+
+    async function openLogoutModal() {
+      const user = userEvent.setup();
+      renderWithRouter(<LeftSideMenu collapsed={false} onCollapse={mockOnCollapse} />);
+      await user.click(screen.getByText('Logout'));
+      await screen.findByText('Do you really want to logout?');
+      return user;
+    }
+
+    it('Logout calls oidc logout without clearAll', async () => {
+      oidcMock.logout.mockResolvedValue('redirecting');
+      const user = await openLogoutModal();
+      await user.click(screen.getByRole('button', { name: /^Logout$/ }));
+      await waitFor(() => expect(oidcMock.logout).toHaveBeenCalledWith());
+      expect(storageMock.remove).not.toHaveBeenCalled();
+    });
+
+    it('Logout and clear calls oidc logout with clearAll', async () => {
+      oidcMock.logout.mockResolvedValue('local');
+      const user = await openLogoutModal();
+      await user.click(screen.getByRole('button', { name: /Logout and Clear Data/ }));
+      await waitFor(() => expect(oidcMock.logout).toHaveBeenCalledWith({ clearAll: true }));
     });
   });
 });

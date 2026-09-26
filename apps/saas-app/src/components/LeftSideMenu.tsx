@@ -23,6 +23,7 @@ import type { MenuProps } from 'antd';
 import { HelperStorage, HelperFeatureFlags } from '@cyoda/http-api-react';
 import { AppLogo } from '@cyoda/ui-lib-react';
 import { useThemeStore } from '../stores/themeStore';
+import { isOidcEnabled, logout as oidcLogout } from '../auth/oidcClient';
 import './LeftSideMenu.scss';
 
 const { Sider } = Layout;
@@ -47,18 +48,29 @@ export const LeftSideMenu: React.FC<LeftSideMenuProps> = ({ collapsed, onCollaps
     setLogoutModalVisible(true);
   };
 
-  const handleLogout = () => {
+  const isOidcSession = () => isOidcEnabled() && helperStorage.get('auth')?.type === 'oidc';
+
+  const handleLogout = async () => {
+    setLogoutModalVisible(false);
+    if (isOidcSession()) {
+      if ((await oidcLogout()) === 'local') navigate('/login');
+      return;
+    }
     // Logout without clearing data
     helperStorage.remove('auth');
-    setLogoutModalVisible(false);
     navigate('/login');
   };
 
-  const handleLogoutAndClear = () => {
+  const handleLogoutAndClear = async () => {
+    setLogoutModalVisible(false);
+    if (isOidcSession()) {
+      // oidcLogout reads the id_token first, then clears all storage.
+      if ((await oidcLogout({ clearAll: true })) === 'local') navigate('/login');
+      return;
+    }
     // Logout and clear all data
     helperStorage.clear();
     localStorage.clear(); // Also clear non-prefixed items
-    setLogoutModalVisible(false);
     navigate('/login');
   };
 

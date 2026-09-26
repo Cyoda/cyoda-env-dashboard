@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
-    "@auth0/auth0-react": "^2.2.4",
     "@cyoda/cyoda-sass-react": "workspace:*",
     "@cyoda/http-api-react": "workspace:*",
     "@cyoda/processing-manager-react": "workspace:*",
