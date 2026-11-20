@@ -1,6 +1,6 @@
 # Cyoda Env Dashboard
 
-> Repository: <https://github.com/Cyoda-platform/cyoda-env-dashboard>
+> Repository: <https://github.com/Cyoda/cyoda-env-dashboard>
 
 A React + TypeScript monorepo for the Cyoda environment dashboard. The repository
 ships a single deployable application — `apps/saas-app` — that composes a set of
@@ -67,7 +67,7 @@ If you have **Docker Desktop** (or OrbStack) and the **Dev Containers**
 VS Code extension, you don't need to install Node, pnpm, or Corepack on
 your host machine at all:
 
-1. `git clone https://github.com/Cyoda-platform/cyoda-env-dashboard.git`
+1. `git clone https://github.com/Cyoda/cyoda-env-dashboard.git`
 2. Open the folder in VS Code → click *Reopen in Container* when prompted.
 3. VS Code pulls the image and runs `pnpm install` automatically.
 
@@ -77,7 +77,7 @@ See [`.devcontainer/README.md`](./.devcontainer/README.md) for details.
 
 ```bash
 # 1. Clone
-git clone https://github.com/Cyoda-platform/cyoda-env-dashboard.git
+git clone https://github.com/Cyoda/cyoda-env-dashboard.git
 cd cyoda-env-dashboard
 
 # 2. Enable Corepack and activate the pinned pnpm version

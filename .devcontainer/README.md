@@ -16,7 +16,7 @@ installed on the host.
 
 1. Clone the repo and open the folder in VS Code:
    ```bash
-   git clone https://github.com/Cyoda-platform/cyoda-env-dashboard.git
+   git clone https://github.com/Cyoda/cyoda-env-dashboard.git
    code cyoda-env-dashboard
    ```
 2. VS Code shows a toast: *"Folder contains a Dev Container configuration
