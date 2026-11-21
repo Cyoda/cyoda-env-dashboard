@@ -52,7 +52,7 @@ If you prefer to manage multiple Node versions, install
 All commands are run from the repository root, **not** from this directory:
 
 ```bash
-git clone https://github.com/Cyoda-platform/cyoda-env-dashboard.git
+git clone https://github.com/Cyoda/cyoda-env-dashboard.git
 cd cyoda-env-dashboard
 pnpm install
 ```
